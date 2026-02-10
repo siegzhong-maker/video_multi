@@ -1,23 +1,2048 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI视频分析全链路原型</title>
-  <meta http-equiv="refresh" content="0; url=ai-multi-clip-design.html">
-  <script>
-    // 防止某些环境下 meta refresh 不生效，做一次 JS 兜底跳转
-    (function() {
-      var target = 'ai-multi-clip-design.html';
-      if (location.pathname.endsWith('/') || location.pathname.endsWith('/index.html')) {
-        window.location.replace(target);
-      } else {
-        window.location.href = target;
-      }
-    })();
-  </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI视频分析全链路原型</title>
+    <style>
+        :root {
+            --bg-color: #F8F8F8; /* 首页背景改为浅色，匹配截图 */
+            --dark-bg: #000000;
+            --card-bg-light: #FFFFFF;
+            --card-bg-dark: #1C1C1E;
+            --primary-color: #FF5500;
+            --text-main-light: #000000;
+            --text-sub-light: #8E8E93;
+            --text-main-dark: #FFFFFF;
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            margin: 0; 
+            background: var(--dark-bg); /* 外层背景深色 */
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            overflow: hidden; 
+        }
+        
+        /* 手机外壳 */
+        .app-container {
+            width: 100%; max-width: 414px; height: 100%;
+            background: var(--bg-color); 
+            position: relative;
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        /* 页面切换机制 */
+        .page {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            display: flex; flex-direction: column;
+            z-index: 10;
+        }
+        .page.hidden { transform: translateX(100%); z-index: 0; pointer-events: none; }
+        .page.active { transform: translateX(0); z-index: 20; pointer-events: auto; }
+        
+        /* 深色模式覆盖 (用于 Select, Sequence, Result 页) */
+        .page.dark-mode { background: var(--dark-bg); color: var(--text-main-dark); }
+
+        /* === 页面1: Studio (新入口) === */
+        #page-home { background: #FFFFFF; overflow-y: auto; padding-bottom: 90px; }
+        
+        .studio-header {
+            padding: 50px 20px 10px;
+            font-size: 28px; font-weight: 700; color: #000;
+        }
+
+        .action-grid {
+            padding: 10px 20px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+
+        /* New Project Card */
+        .card-new-project {
+            background: linear-gradient(135deg, #FFF0E6 0%, #FFF 100%);
+            border: 1px solid #FFE4D6;
+            border-radius: 16px; padding: 30px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(255, 85, 0, 0.05);
+            margin-bottom: 4px;
+        }
+        .plus-icon {
+            width: 32px; height: 32px; background: var(--primary-color);
+            border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; margin-bottom: 8px; font-weight: 300;
+        }
+        .card-title-orange { color: var(--primary-color); font-weight: 700; font-size: 16px; }
+
+        /* Small Cards Row */
+        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        
+        .feature-card {
+            background: #F9F9F9; border-radius: 16px; padding: 16px;
+            display: flex; align-items: center; gap: 10px;
+            border: 0.5px solid #EEE;
+        }
+        .icon-circle {
+            width: 36px; height: 36px; background: #FFF; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .card-text { font-size: 14px; font-weight: 600; color: #333; line-height: 1.2; }
+
+        /* AI Analysis Card (Target) */
+        .card-ai-analysis {
+            background: #222; 
+            border-radius: 16px; padding: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            color: white; margin-top: 4px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .ai-left { display: flex; align-items: center; gap: 12px; }
+        .ai-icon-box {
+            width: 40px; height: 40px; 
+            background: linear-gradient(135deg, #9C2CF3, #3A8DFF); /* AI Gradient */
+            border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;
+        }
+        .ai-desc { font-size: 12px; color: #999; margin-top: 2px; }
+
+        /* Tabs Section */
+        .section-tabs {
+            padding: 20px 20px 10px; display: flex; gap: 24px;
+            border-bottom: 0.5px solid #EEE;
+        }
+        .section-tab { font-size: 20px; font-weight: 700; color: #CCC; position: relative; }
+        .section-tab.active { color: #000; }
+        .section-tab.active::after {
+            content: ''; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 3px; background: var(--primary-color); border-radius: 2px;
+        }
+
+        .filter-chips { padding: 16px 20px; display: flex; gap: 10px; }
+        .chip { padding: 6px 14px; background: #F5F5F5; border-radius: 6px; font-size: 13px; color: #666; font-weight: 500; }
+        .chip.active { background: var(--primary-color); color: white; }
+
+        .template-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px;
+        }
+        .template-item { border-radius: 12px; overflow: hidden; background: #EEE; }
+        .temp-img { width: 100%; aspect-ratio: 4/3; background-size: cover; background-position: center; }
+        .temp-name { padding: 8px 4px; font-size: 13px; color: #666; }
+
+        /* Bottom Tab Bar */
+        .tab-bar {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 85px;
+            background: #FFFFFF; border-top: 0.5px solid #EEE;
+            display: flex; justify-content: space-around; padding-top: 10px;
+            z-index: 50;
+        }
+        .tab-item { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 60px; }
+        .tab-icon { width: 24px; height: 24px; fill: #999; }
+        .tab-text { font-size: 10px; color: #999; font-weight: 500; }
+        .tab-item.active .tab-icon { fill: #000; }
+        .tab-item.active .tab-text { color: #000; }
+        
+        .tab-camera-btn {
+            width: 48px; height: 48px; background: #666; 
+            border-radius: 50%; margin-top: -16px;
+            display: flex; align-items: center; justify-content: center;
+            border: 4px solid #FFF; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* === 页面2: 视频选择 (Dark Mode) === */
+        .nav-bar {
+            height: 44px; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 16px; background: rgba(28,28,30,0.95); z-index: 50;
+            font-size: 17px; font-weight: 600; color: white;
+            border-bottom: 0.5px solid #333;
+        }
+        .icon-btn { background: none; border: none; padding: 5px; cursor: pointer; }
+        .icon-btn svg { width: 24px; height: 24px; fill: white; }
+
+        .segment-tabs { display: flex; gap: 12px; padding: 12px 16px; background: var(--dark-bg); }
+        .seg-tab { background: #2C2C2E; color: #8E8E93; border: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+        .seg-tab.active { background: var(--primary-color); color: white; }
+
+        .select-hint { margin: 0 16px 12px; font-size: 12px; color: #8E8E93; }
+
+        .scroll-content { flex: 1; overflow-y: auto; padding-bottom: 100px; background: var(--dark-bg); }
+        
+        .date-divider { padding: 16px 16px 8px; font-size: 13px; color: #8E8E93; }
+        .video-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; padding: 0 0px; } /* Instagram style grid */
+        
+        .video-card {
+            position: relative; aspect-ratio: 1; background: #333; overflow: hidden;
+            cursor: pointer;
+        }
+        /* 选中态遮罩 */
+        .video-card::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 85, 0, 0.4); opacity: 0; transition: opacity 0.2s;
+            border: 3px solid var(--primary-color); box-sizing: border-box;
+        }
+        .video-card.selected::after { opacity: 1; }
+        
+        .video-thumb { width: 100%; height: 100%; background-size: cover; background-position: center; transition: transform 0.3s; }
+        
+        .meta-badge {
+            position: absolute; bottom: 4px; right: 4px;
+            font-size: 10px; color: white; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            z-index: 5;
+        }
+        
+        /* 多段图标 */
+        .group-icon {
+            position: absolute; top: 6px; right: 6px;
+            width: 18px; height: 18px; background: rgba(255,255,255,0.9);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .group-icon svg { width: 12px; height: 12px; fill: #000; }
+
+        /* 选中勾选圈 */
+        .check-circle {
+            position: absolute; top: 6px; right: 6px;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: var(--primary-color); border: 2px solid white;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transform: scale(0.8); transition: all 0.2s; z-index: 6;
+        }
+        .video-card.selected .check-circle { opacity: 1; transform: scale(1); }
+        .video-card.selected .group-icon { display: none; } /* Hide group icon when selected */
+
+        /* 未同步到云：置灰、不可选 */
+        .video-card.disabled { opacity: 0.6; cursor: not-allowed; pointer-events: auto; }
+        .video-card.disabled .video-thumb { filter: grayscale(0.3); }
+        .sync-badge {
+            position: absolute; top: 6px; left: 6px;
+            font-size: 9px; color: rgba(255,255,255,0.9); background: rgba(0,0,0,0.6);
+            padding: 2px 6px; border-radius: 4px; z-index: 5;
+        }
+        .video-card.disabled .sync-badge { display: block; }
+        .video-card:not(.disabled) .sync-badge { display: none; }
+
+        /* Toast 轻提示 */
+        .toast-wrap {
+            position: fixed; left: 50%; transform: translateX(-50%);
+            bottom: 100px; z-index: 300;
+            background: #2C2C2E; color: white;
+            padding: 12px 20px; border-radius: 10px; font-size: 13px;
+            max-width: 86%; text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .toast-wrap.show { opacity: 1; }
+
+        /* 底部操作栏 */
+        .bottom-action-bar {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: #1C1C1E; border-top: 0.5px solid #333;
+            padding: 12px 16px calc(12px + var(--safe-area-bottom)); z-index: 100;
+        }
+        .btn-full {
+            width: 100%; height: 48px; background: var(--primary-color);
+            border: none; border-radius: 24px; color: white; font-size: 16px; font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .btn-full:disabled { background: #333; color: #666; opacity: 1; }
+
+        /* === 弹窗 (Smart Merge) === */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 200;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-box {
+            width: 80%; background: #2C2C2E; border-radius: 14px; overflow: hidden;
+            transform: scale(0.95); transition: transform 0.2s;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .modal-overlay.show .modal-box { transform: scale(1); }
+        .modal-content { padding: 24px 20px; text-align: center; color: white; }
+        .modal-icon-lg { 
+            width: 50px; height: 50px; background: #333; border-radius: 50%; 
+            margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; 
+        }
+        .modal-btns { display: flex; flex-direction: column; border-top: 0.5px solid #38383A; }
+        .modal-btn { 
+            padding: 16px; background: rgba(255,255,255,0.05); 
+            border: none; border-bottom: 0.5px solid #38383A; 
+            color: var(--primary-color); font-size: 16px; cursor: pointer;
+        }
+        .modal-btn:active { background: rgba(255,255,255,0.1); }
+        .modal-btn:last-child { border: none; color: white; font-weight: 400; }
+
+        /* === 页面3: 排序 (Sequence) === */
+        .seq-list { padding: 16px; }
+        .seq-item {
+            display: flex; align-items: center; gap: 12px;
+            background: #2C2C2E; padding: 10px; border-radius: 8px; margin-bottom: 8px;
+        }
+        .seq-idx { color: #888; width: 24px; text-align: center; font-weight: bold; font-size: 14px; }
+        .seq-img { width: 70px; height: 40px; background: #444; border-radius: 4px; object-fit: cover; }
+        .seq-info { flex: 1; }
+        .seq-title { font-size: 13px; color: white; margin-bottom: 2px; }
+        .seq-time { font-size: 11px; color: #888; }
+
+        /* === 页面4: Loading === */
+        .upload-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .loader-ring {
+            width: 50px; height: 50px; border: 4px solid #333;
+            border-top: 4px solid var(--primary-color); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* === 任务列表页（传输与分析进度）=== */
+        .task-list-scroll { flex: 1; overflow-y: auto; background: var(--dark-bg); padding: 16px; padding-bottom: 100px; }
+        .task-list-intro { font-size: 12px; color: #8E8E93; margin: 0 0 12px 0; line-height: 1.4; }
+        .task-top-progress { margin-bottom: 16px; }
+        .task-top-progress #task-progress-fraction { font-size: 18px; font-weight: 700; color: white; }
+        .task-top-progress #task-progress-label { font-size: 13px; color: #8E8E93; margin-left: 6px; }
+        .task-top-progress-bar { height: 4px; background: #2C2C2E; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .task-top-progress-fill { height: 100%; background: var(--primary-color); border-radius: 2px; transition: width 0.2s ease; width: 0%; }
+
+        /* 统一任务卡片样式（分段 & 非分段） */
+        .task-card {
+            background: #1C1C1E;
+            border-radius: 12px;
+            padding: 10px 12px 12px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .task-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .task-card-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .task-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #FFFFFF;
+            max-width: 190px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-card-type-tag {
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            color: #FF9F0A;
+            background: rgba(255, 159, 10, 0.15);
+        }
+        .task-card-status-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #FFFFFF;
+            flex-shrink: 0;
+        }
+        .task-card-status-text {
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-card-main {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .task-card-main-right {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .task-card-subtitle {
+            font-size: 13px;
+            color: #E5E5EA;
+        }
+        .task-card-time-range {
+            font-size: 11px;
+            color: #8E8E93;
+        }
+        .task-card-meta-time {
+            font-size: 11px;
+            color: #636366;
+        }
+        .task-card-bottom {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .task-card-bottom-left {
+            flex: 1;
+            min-width: 0;
+        }
+        .task-card-progress-text {
+            font-size: 12px;
+            color: #8E8E93;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-card-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #2C2C2E;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .task-card-progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+        .task-card-btn {
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+            background: var(--primary-color);
+            color: #FFFFFF;
+        }
+        .task-card-btn.secondary {
+            background: #333333;
+            color: #CCCCCC;
+        }
+        .task-item {
+            display: flex; align-items: center; gap: 12px;
+            background: #1C1C1E; border-radius: 12px; padding: 12px; margin-bottom: 12px;
+        }
+        .task-item-thumb-wrap { position: relative; flex-shrink: 0; }
+        .task-item-thumb { width: 72px; height: 72px; border-radius: 8px; background: #333; background-size: cover; background-position: center; }
+        .task-item-duration-badge { position: absolute; right: 4px; bottom: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.75); font-size: 11px; color: rgba(255,255,255,0.9); }
+        .task-item-body { flex: 1; min-width: 0; }
+        .task-item-title { font-size: 15px; font-weight: 600; color: white; margin-bottom: 6px; }
+        .task-item-status { display: flex; align-items: center; gap: 6px; font-size: 14px; color: white; margin-bottom: 6px; }
+        .task-item-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .task-item-dot.green { background: #34C759; }
+        .task-item-dot.red { background: #FF3B30; }
+        .task-item-tag { display: inline-block; padding: 2px 8px; background: #2C2C2E; border-radius: 6px; font-size: 11px; color: #8E8E93; margin-bottom: 4px; }
+        .task-item-time { font-size: 11px; color: #666; }
+        .task-item-segment-meta { font-size: 11px; color: #8E8E93; margin-top: 2px; }
+        .task-item-view { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; flex-shrink: 0; }
+        .task-item-view.pending { background: #333; color: #666; cursor: not-allowed; }
+        .task-item-view.done { background: var(--primary-color); color: white; }
+        .task-item.failed .task-item-dot { background: #FF3B30; }
+        .task-item.failed .task-item-status { color: #FF6B6B; }
+        .task-item-error { font-size: 12px; color: #FF6B6B; margin-top: 4px; }
+        .task-item-retry { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; background: #2C2C2E; color: white; flex-shrink: 0; }
+        .task-item-retry:hover { background: #3A3A3C; }
+        .task-section-title { font-size: 15px; font-weight: 700; color: white; margin: 20px 0 12px; }
+        .task-section-title:first-of-type { margin-top: 0; }
+        .task-summary { padding: 12px 16px; background: #1C1C1E; border-radius: 12px; margin-bottom: 12px; font-size: 14px; color: #8E8E93; }
+        .task-summary strong { color: white; }
+        .task-summary-hint { margin: 8px 0 0 0; font-size: 13px; color: #8E8E93; line-height: 1.4; }
+        .task-summary-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .task-summary-actions .btn-secondary { padding: 8px 14px; border-radius: 8px; font-size: 13px; border: 1px solid #444; background: transparent; color: #8E8E93; cursor: pointer; }
+        .task-summary-actions .btn-primary { padding: 8px 14px; border-radius: 8px; font-size: 13px; border: none; background: var(--primary-color); color: white; cursor: pointer; }
+
+        /* 分段保存任务：可折叠/展开，展开后显示各片段进度 */
+        .task-segment-group { background: #1C1C1E; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+        .task-segment-header {
+            display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+            cursor: pointer; user-select: none;
+        }
+        .task-segment-header:hover { background: rgba(255,255,255,0.03); }
+        .task-segment-header-thumb-wrap { position: relative; flex-shrink: 0; }
+        .task-segment-header-thumb { width: 72px; height: 72px; border-radius: 8px; background: #333; background-size: cover; background-position: center; }
+        .task-segment-header-thumb-wrap .task-item-duration-badge { position: absolute; right: 4px; bottom: 4px; }
+        .task-segment-header-left { flex: 1; min-width: 0; }
+        .task-segment-header-title { font-size: 15px; font-weight: 600; color: white; margin-bottom: 4px; }
+        .task-segment-header-segment { font-size: 13px; color: #8E8E93; margin-bottom: 4px; }
+        .task-segment-header-status { display: flex; align-items: center; gap: 6px; font-size: 14px; color: white; margin-bottom: 6px; }
+        .task-segment-header-progress { font-size: 13px; color: #8E8E93; }
+        .task-segment-header-tag { display: inline-block; padding: 2px 8px; background: #2C2C2E; border-radius: 6px; font-size: 11px; color: #8E8E93; margin-bottom: 4px; }
+        .task-segment-header-time { font-size: 11px; color: #666; margin-top: 0; }
+        .task-segment-header-bar { height: 4px; background: #2C2C2E; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+        .task-segment-header-fill { height: 100%; background: var(--primary-color); border-radius: 2px; transition: width 0.2s ease; }
+        .task-segment-chevron { width: 24px; height: 24px; flex-shrink: 0; color: #8E8E93; transition: transform 0.2s; }
+        .task-segment-group.expanded .task-segment-chevron { transform: rotate(180deg); }
+        .task-segment-body { display: none; border-top: 0.5px solid #2C2C2E; padding: 8px 12px 12px; }
+        .task-segment-group.expanded .task-segment-body { display: block; }
+        .task-segment-body .task-item { margin-bottom: 8px; }
+        .task-segment-body .task-item:last-child { margin-bottom: 0; }
+
+        /* === 页面5: 结果页（集锦 + 数据看版）=== */
+        .result-header { height: 200px; background: #000; position: relative; flex-shrink: 0; }
+        .mock-player { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+
+        .analysis-note {
+            background: #1C1C1E; padding: 12px 16px; display: flex; flex-direction: column;
+            border-bottom: 0.5px solid #333; cursor: pointer; flex-shrink: 0;
+        }
+        .analysis-note-row { display: flex; align-items: center; justify-content: space-between; }
+        .analysis-note-left { display: flex; align-items: center; gap: 8px; color: #8E8E93; font-size: 13px; }
+        .analysis-note-chevron { transition: transform 0.2s; color: #8E8E93; }
+        .analysis-note.expanded .analysis-note-chevron { transform: rotate(180deg); }
+        .analysis-note-body { display: none; padding: 12px 16px; padding-top: 8px; background: #111; font-size: 12px; color: #8E8E93; line-height: 1.5; margin: 12px -16px -12px -16px; }
+        .analysis-note.expanded .analysis-note-body { display: block; }
+
+        .result-tabs { display: flex; gap: 12px; padding: 12px 16px; background: var(--dark-bg); flex-shrink: 0; }
+        .result-tab { background: #2C2C2E; color: #8E8E93; border: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+        .result-tab.active { background: var(--primary-color); color: white; }
+
+        .result-scroll { flex: 1; overflow-y: auto; background: #111; padding-bottom: 80px; }
+        .result-panel { display: none; padding: 16px; }
+        .result-panel.active { display: block; }
+
+        /* 集锦 Tab */
+        .hl-category-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .hl-category-chip { padding: 6px 12px; background: #2C2C2E; color: #8E8E93; border-radius: 6px; font-size: 12px; border: none; cursor: pointer; }
+        .hl-category-chip.active { background: var(--primary-color); color: white; }
+        .hl-thumb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 16px; }
+        .hl-thumb-item { aspect-ratio: 1; background: #333; border-radius: 6px; position: relative; overflow: hidden; }
+        .hl-thumb-item .thumb { width: 100%; height: 100%; background-size: cover; background-position: center; }
+        .hl-thumb-item .type-tag { position: absolute; bottom: 0; left: 0; background: rgba(0,0,0,0.7); color: white; font-size: 9px; padding: 2px 4px; }
+        .hl-thumb-item .time-tag { position: absolute; top: 4px; right: 4px; font-size: 9px; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .hl-thumb-item.selected::after { content: ''; position: absolute; inset: 0; border: 2px solid var(--primary-color); border-radius: 6px; pointer-events: none; }
+        .hl-thumb-item.selected .check { position: absolute; top: 4px; left: 4px; color: var(--primary-color); font-size: 12px; z-index: 2; }
+        .hl-mode-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .hl-mode-chip { padding: 6px 12px; background: #2C2C2E; color: #8E8E93; border-radius: 6px; font-size: 12px; border: none; cursor: pointer; }
+        .hl-mode-chip.active { background: var(--primary-color); color: white; }
+        .result-panel-highlights .bottom-bar { position: absolute; bottom: 0; left: 0; width: 100%; padding: 12px 16px calc(12px + var(--safe-area-bottom)); background: #1C1C1E; border-top: 0.5px solid #333; }
+        .result-panel-highlights .btn-generate { width: 100%; height: 48px; background: #333; color: white; border: none; border-radius: 24px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+        /* 数据看版 Tab */
+        .report-score-row { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 20px 0; flex-wrap: wrap; }
+        .report-team { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
+        .report-team-badge { width: 40px; height: 40px; background: #2C2C2E; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; }
+        .report-team-name { font-size: 12px; color: #8E8E93; }
+        .report-score-val { font-size: 28px; font-weight: 800; color: white; letter-spacing: 2px; }
+        .report-date { text-align: center; font-size: 11px; color: #666; margin-top: -8px; margin-bottom: 16px; }
+        .report-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
+        .report-bar-label { width: 100px; color: #8E8E93; flex-shrink: 0; }
+        .report-bar-track { flex: 1; height: 8px; background: #2C2C2E; border-radius: 4px; display: flex; overflow: hidden; }
+        .report-bar-a { height: 100%; background: var(--primary-color); border-radius: 4px 0 0 4px; }
+        .report-bar-b { height: 100%; background: #555; border-radius: 0 4px 4px 0; }
+        .report-bar-vals { width: 70px; text-align: right; color: white; flex-shrink: 0; }
+        .report-team-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+        .report-team-card { background: #2C2C2E; border-radius: 12px; padding: 16px; }
+        .report-team-card .pts { font-size: 20px; font-weight: 800; color: white; margin-bottom: 8px; }
+        .report-team-card .stat-line { font-size: 11px; color: #8E8E93; margin-bottom: 4px; }
+        .result-panel-report .bottom-bar { position: absolute; bottom: 0; left: 0; width: 100%; padding: 12px 16px calc(12px + var(--safe-area-bottom)); background: #1C1C1E; border-top: 0.5px solid #333; }
+        .result-panel-report .btn-download { width: 100%; height: 48px; background: var(--primary-color); color: white; border: none; border-radius: 24px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+    </style>
 </head>
-<body style="margin:0; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;">
-  <p style="font-size:14px; color:#888;">正在跳转到 AI 分析原型页面… 如果没有自动跳转，请<a href="ai-multi-clip-design.html" style="color:#ff5500; margin-left:4px;">点击这里</a>。</p>
+<body>
+
+<div class="app-container">
+
+    <!-- === 页面1: Studio Home === -->
+    <div id="page-home" class="page active">
+        <div class="studio-header">Studio</div>
+        
+        <div class="action-grid">
+            <!-- Main Card -->
+            <div class="card-new-project">
+                <div class="plus-icon">+</div>
+                <div class="card-title-orange">New Project</div>
+            </div>
+            
+            <!-- Feature Row -->
+            <div class="grid-row">
+                <div class="feature-card">
+                    <div class="icon-circle">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#333"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM8 15c0-1.66 1.34-3 3-3 .35 0 .69.07 1 .18V6h5v2h-3v7.03c-.02 1.64-1.35 2.97-3 2.97-1.66 0-3-1.34-3-3z"/></svg>
+                    </div>
+                    <div class="card-text">Auto<br>Edit</div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-circle">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#333"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <div class="card-text">Edit<br>Markers</div>
+                </div>
+            </div>
+
+            <!-- Merge Row -->
+            <div class="feature-card" style="justify-content: flex-start;">
+                <div class="icon-circle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#333"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z"/></svg>
+                </div>
+                <div class="card-text">Fast Video Merge</div>
+            </div>
+
+            <!-- AI Analysis Entry (Target) -->
+            <div class="card-ai-analysis" onclick="navTo('page-task-list')">
+                <div class="ai-left">
+                    <div class="ai-icon-box">AI</div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 15px;">AI Analysis</div>
+                        <div class="ai-desc">Quickly detect game highlights</div>
+                    </div>
+                </div>
+                <svg width="24" height="24" fill="#666" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </div>
+        </div>
+
+        <!-- Templates -->
+        <div class="section-tabs">
+            <div class="section-tab active">Template</div>
+            <div class="section-tab">Drafts</div>
+        </div>
+        
+        <div class="filter-chips">
+            <div class="chip active">All</div>
+            <div class="chip">Slow tempo</div>
+            <div class="chip">Fast tempo</div>
+        </div>
+
+        <div class="template-grid">
+            <div class="template-item">
+                <div class="temp-img" style="background-image: url('https://images.unsplash.com/photo-1546519638-68e109498ee3?auto=format&fit=crop&w=400&q=80');"></div>
+                <div class="temp-name">Pro Match V1</div>
+            </div>
+            <div class="template-item">
+                <div class="temp-img" style="background-image: url('https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=400&q=80');"></div>
+                <div class="temp-name">Practice Drill</div>
+            </div>
+        </div>
+
+        <!-- Bottom Tab Bar -->
+        <div class="tab-bar">
+            <div class="tab-item">
+                <svg class="tab-icon" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                <span class="tab-text">Home</span>
+            </div>
+            <div class="tab-item">
+                <svg class="tab-icon" viewBox="0 0 24 24"><path d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>
+                <span class="tab-text">Gallery</span>
+            </div>
+            <div class="tab-item">
+                <div class="tab-camera-btn">
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M9.4 5l-1.6 1.7h-3.8c-1.1 0-2 .9-2 2v10.3c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2v-10.3c0-1.1-.9-2-2-2h-3.8l-1.6-1.7h-5.2zm5.6 12.3c-2.7 0-4.9-2.2-4.9-4.9s2.2-4.9 4.9-4.9 4.9 2.2 4.9 4.9-2.2 4.9-4.9 4.9z"/></svg>
+                </div>
+            </div>
+            <div class="tab-item active">
+                <svg class="tab-icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                <span class="tab-text">Create</span>
+            </div>
+            <div class="tab-item">
+                <svg class="tab-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+                <span class="tab-text">Account</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- === 页面2: 视频选择 (Select) === -->
+    <div id="page-select" class="page dark-mode hidden">
+        <div class="nav-bar">
+            <button class="icon-btn" onclick="navTo('page-home')">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <span>Select Video</span>
+            <div style="width:34px"></div>
+        </div>
+        
+        <div class="segment-tabs">
+            <button class="seg-tab active" data-tab="falcon">Falcon</button>
+            <button class="seg-tab" data-tab="local">Local</button>
+            <button class="seg-tab" data-tab="cloud">Cloud</button>
+        </div>
+
+        <p class="select-hint">未同步视频将自动完成本地传输与上云后进行分析</p>
+
+        <div class="scroll-content" id="select-scroll">
+            <div id="select-video-grid-container"></div>
+        </div>
+
+        <div class="bottom-action-bar">
+            <button id="btn-start" class="btn-full" disabled onclick="handleStart()">Select a Video</button>
+        </div>
+    </div>
+
+    <!-- === 弹窗 (Smart Merge Modal) === -->
+    <div class="modal-overlay" id="modal-merge">
+        <div class="modal-box">
+            <div class="modal-content">
+                <div class="modal-icon-lg">
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c3.04 0 5.5 2.46 5.5 5.5v.5H19c1.66 0 3 1.34 3 3s-1.34 3-3 3z"/></svg>
+                </div>
+                <h3 style="margin:0 0 8px 0; font-size:18px;">智能分组</h3>
+                <p style="margin:0; font-size:13px; color:#AAA; line-height:1.4;">
+                    当前赛事存在多段视频，将自动勾选相关视频
+                </p>
+            </div>
+            <div class="modal-btns">
+                <button class="modal-btn" style="font-weight:600" onclick="confirmMerge()">确认</button>
+                <button class="modal-btn" onclick="cancelMerge()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === 页面3: 排序 (Sequence) === -->
+    <div id="page-sequence" class="page dark-mode hidden">
+        <div class="nav-bar">
+            <button class="icon-btn" onclick="navTo('page-select')">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <span>Confirm Sequence</span>
+            <div style="width:34px"></div>
+        </div>
+        
+        <div style="padding:16px; font-size:13px; color:#8E8E93;">AI has auto-sorted the clips by time:</div>
+        
+        <div class="seq-list">
+            <div class="seq-item">
+                <div class="seq-idx">1</div>
+                <img class="seq-img" src="https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=100&q=60">
+                <div class="seq-info">
+                    <div class="seq-title">Part_01_Q1.mp4</div>
+                    <div class="seq-time">04:21 • 14:20 PM</div>
+                </div>
+                <svg width="20" height="20" fill="#666" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </div>
+            <div class="seq-item">
+                <div class="seq-idx">2</div>
+                <img class="seq-img" src="https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=100&q=60" style="filter:hue-rotate(10deg)">
+                <div class="seq-info">
+                    <div class="seq-title">Part_02_Q2.mp4</div>
+                    <div class="seq-time">03:10 • 14:25 PM</div>
+                </div>
+                <svg width="20" height="20" fill="#666" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </div>
+            <div class="seq-item">
+                <div class="seq-idx">3</div>
+                <img class="seq-img" src="https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=100&q=60" style="filter:hue-rotate(20deg)">
+                <div class="seq-info">
+                    <div class="seq-title">Part_03_Q4.mp4</div>
+                    <div class="seq-time">10:05 • 14:30 PM</div>
+                </div>
+                <svg width="20" height="20" fill="#666" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </div>
+        </div>
+
+        <div class="bottom-action-bar">
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:12px; color:#888;">
+                <span>Merged Duration</span>
+                <span style="color:white;">17:36</span>
+            </div>
+            <button class="btn-full" onclick="startLoading()">Start Analysis (3 Clips)</button>
+        </div>
+    </div>
+
+    <!-- === 页面4: Loading === -->
+    <div id="page-loading" class="page dark-mode hidden" style="z-index:100; background:rgba(0,0,0,0.9);">
+        <div class="upload-center">
+            <div class="loader-ring"></div>
+            <h3 id="loading-text" style="color:white; font-size:16px;">AI Analyzing...</h3>
+            <p id="loading-sub" style="color:#666; font-size:12px;">Identifying game events</p>
+        </div>
+    </div>
+
+    <!-- === 任务列表页（传输与分析进度）=== -->
+    <div id="page-task-list" class="page dark-mode hidden" style="display:flex; flex-direction:column;">
+        <div class="nav-bar">
+            <button class="icon-btn" onclick="navTo('page-home')">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <span>AI analysis</span>
+            <div style="width:34px"></div>
+        </div>
+        <div class="task-list-scroll">
+            <p class="task-list-intro" id="task-list-intro">所有上传中的和已完成的视频分析任务都会展示在这里。分段任务以整场为单位展示，可进入详情页查看每一段的进度和结果。</p>
+            <div class="task-top-progress" id="task-top-progress">
+                <span id="task-progress-fraction">0/0</span>
+                <span id="task-progress-label">视频片段已完成分析</span>
+                <div class="task-top-progress-bar"><div class="task-top-progress-fill" id="task-top-progress-fill"></div></div>
+            </div>
+            <div id="task-current-wrap">
+                <div class="task-item" id="task-current-item">
+                    <div class="task-item-thumb-wrap">
+                        <div class="task-item-thumb" id="task-current-thumb"></div>
+                        <span class="task-item-duration-badge" id="task-current-duration" style="display:none;"></span>
+                    </div>
+                    <div class="task-item-body">
+                        <div class="task-item-title" id="task-current-title"></div>
+                        <div class="task-item-status">
+                            <span class="task-item-dot green" id="task-current-dot"></span>
+                            <span id="task-current-status">• 本地传输中…</span>
+                            <span id="task-current-pct"></span>
+                        </div>
+                        <div class="task-item-tag">篮球</div>
+                        <div class="task-item-time" id="task-current-time">开始分析: --</div>
+                    </div>
+                    <button class="task-item-view pending" id="task-current-view" disabled>View</button>
+                </div>
+            </div>
+            <div class="task-section-title">分析任务</div>
+            <div id="task-completed-list"></div>
+            <div id="task-summary-wrap" class="task-summary" style="display:none;"></div>
+        </div>
+        <div class="bottom-action-bar">
+            <button class="btn-full" id="btn-task-primary" onclick="navTo('page-select')">选择视频</button>
+        </div>
+    </div>
+
+    <!-- === 任务详情页：分段 / 非分段任务详情 === -->
+    <div id="page-task-detail" class="page dark-mode hidden" style="display:flex; flex-direction:column;">
+        <div class="nav-bar">
+            <button class="icon-btn" onclick="navTo('page-task-list')">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <span id="task-detail-title">任务详情</span>
+            <div style="width:34px"></div>
+        </div>
+        <div class="task-list-scroll">
+            <div id="task-detail-header" class="task-summary" style="margin-top:0; display:none;"></div>
+            <div class="task-section-title" id="task-detail-section-title" style="display:none;">分段列表</div>
+            <div id="task-detail-list"></div>
+        </div>
+        <div class="bottom-action-bar">
+            <button class="btn-full" id="btn-task-detail-primary">查看结果</button>
+        </div>
+    </div>
+
+    <!-- === 页面5: 结果页（集锦 + 数据看版）=== -->
+    <div id="page-result" class="page dark-mode hidden" style="display:flex; flex-direction:column;">
+        <div class="nav-bar">
+            <button class="icon-btn" onclick="navTo('page-home')">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <span>比赛统计</span>
+            <div style="width:34px"></div>
+        </div>
+
+        <div class="result-header">
+            <div class="mock-player">
+                <svg width="40" height="40" fill="rgba(255,255,255,0.8)" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+        </div>
+
+        <div class="analysis-note" id="analysis-note" onclick="toggleAnalysisNote()">
+            <div class="analysis-note-row">
+                <div class="analysis-note-left">
+                    <span style="opacity:0.8;">&#9432;</span>
+                    <span>Analysis Note</span>
+                </div>
+                <span class="analysis-note-chevron">&#8964;</span>
+            </div>
+            <div class="analysis-note-body" id="analysis-note-body">此处为分析说明占位文案，可展开查看。AI 已识别比赛事件并生成集锦与数据看版。</div>
+        </div>
+
+        <div class="result-tabs">
+            <button class="result-tab" data-result-tab="highlights" id="result-tab-highlights">集锦</button>
+            <button class="result-tab active" data-result-tab="report" id="result-tab-report">数据看版</button>
+        </div>
+
+        <div class="result-scroll">
+            <!-- 集锦面板 -->
+            <div id="result-panel-highlights" class="result-panel">
+                <div class="hl-category-row">
+                    <button class="hl-category-chip active">全部</button>
+                    <button class="hl-category-chip">罚球</button>
+                    <button class="hl-category-chip">两分球</button>
+                    <button class="hl-category-chip">三分球</button>
+                </div>
+                <div class="hl-thumb-grid" id="hl-thumb-container"></div>
+                <div class="hl-mode-row">
+                    <button class="hl-mode-chip active">自主择取</button>
+                    <button class="hl-mode-chip">全场集锦</button>
+                    <button class="hl-mode-chip">A队集锦</button>
+                    <button class="hl-mode-chip">B队集锦</button>
+                </div>
+            </div>
+
+            <!-- 数据看版面板 -->
+            <div id="result-panel-report" class="result-panel active">
+                <div class="report-score-row">
+                    <div class="report-team">
+                        <div class="report-team-badge">A</div>
+                        <span class="report-team-name">Team A</span>
+                    </div>
+                    <div class="report-score-val">80 - 70</div>
+                    <div class="report-team">
+                        <div class="report-team-badge">B</div>
+                        <span class="report-team-name">Team B</span>
+                    </div>
+                </div>
+                <div class="report-date">2025-09-05 13:48</div>
+                <div class="report-bar-row"><span class="report-bar-label">Score</span><div class="report-bar-track"><div class="report-bar-a" style="width:53%"></div><div class="report-bar-b" style="width:47%"></div></div><span class="report-bar-vals">80 vs 70</span></div>
+                <div class="report-bar-row"><span class="report-bar-label">Free Throws</span><div class="report-bar-track"><div class="report-bar-a" style="width:50%"></div><div class="report-bar-b" style="width:50%"></div></div><span class="report-bar-vals">14 vs 14</span></div>
+                <div class="report-bar-row"><span class="report-bar-label">Three-Pointers</span><div class="report-bar-track"><div class="report-bar-a" style="width:100%"></div><div class="report-bar-b" style="width:0%"></div></div><span class="report-bar-vals">10 vs 0</span></div>
+                <div class="report-bar-row"><span class="report-bar-label">Total Shots</span><div class="report-bar-track"><div class="report-bar-a" style="width:59%"></div><div class="report-bar-b" style="width:41%"></div></div><span class="report-bar-vals">20 vs 14</span></div>
+                <div class="report-bar-row"><span class="report-bar-label">Field Goal %</span><div class="report-bar-track"><div class="report-bar-a" style="width:60%"></div><div class="report-bar-b" style="width:40%"></div></div><span class="report-bar-vals">52.08% vs 35.21%</span></div>
+                <div class="report-bar-row"><span class="report-bar-label">Free Throw %</span><div class="report-bar-track"><div class="report-bar-a" style="width:53%"></div><div class="report-bar-b" style="width:47%"></div></div><span class="report-bar-vals">83.33% vs 73.68%</span></div>
+                <div class="report-bar-row"><span class="report-bar-label">Three-Point %</span><div class="report-bar-track"><div class="report-bar-a" style="width:77%"></div><div class="report-bar-b" style="width:23%"></div></div><span class="report-bar-vals">55.56% vs 16.67%</span></div>
+                <div class="report-team-cards">
+                    <div class="report-team-card">
+                        <div class="pts">80 PTS</div>
+                        <div class="stat-line">21 FT &nbsp; 83.33% FT%</div>
+                        <div class="stat-line">20 FG &nbsp; 52.08% FG%</div>
+                        <div class="stat-line">20 3PF &nbsp; 55.56% 3PT%</div>
+                    </div>
+                    <div class="report-team-card">
+                        <div class="pts">70 PTS</div>
+                        <div class="stat-line">14 FT &nbsp; 73.68% FT%</div>
+                        <div class="stat-line">14 FG &nbsp; 35.21% FG%</div>
+                        <div class="stat-line">14 3PF &nbsp; 16.67% 3PT%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-action-bar result-bar-highlights" id="result-bar-highlights" style="display:none;">
+            <button class="btn-full" style="background:#333;" onclick="onGenerateHighlights()">生成集锦</button>
+        </div>
+        <div class="bottom-action-bar result-bar-report" id="result-bar-report">
+            <button class="btn-full" onclick="onDownloadPoster()">下载海报</button>
+        </div>
+    </div>
+
+    <!-- Toast for sync hint -->
+    <div class="toast-wrap" id="toast-sync">该视频尚未同步到云，请先完成同步后再分析</div>
+    <!-- Toast for generic messages (network, storage, etc.) -->
+    <div class="toast-wrap" id="toast-message"></div>
+</div>
+
+<script>
+    // 传输状态：仅设备 / 已到本地 / 已到云（仅 cloud 可分析）
+    const VIDEO_LISTS = {
+        falcon: [
+            { id: 'vid-group-1', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true },
+            { id: 'vid-group-2', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false },
+            { id: 'vid-group-3', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false },
+            { id: 'vid-single-1', type: 'single1', syncStatus: 'device_only', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false },
+            { id: 'vid-single-2', type: 'single2', syncStatus: 'local', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false }
+        ],
+        local: [
+            { id: 'vid-group-1', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true },
+            { id: 'vid-group-2', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false },
+            { id: 'vid-group-3', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false },
+            { id: 'vid-single-1', type: 'single1', syncStatus: 'cloud', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false },
+            { id: 'vid-single-2', type: 'single2', syncStatus: 'local', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false }
+        ],
+        cloud: [
+            { id: 'vid-group-1', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true },
+            { id: 'vid-group-2', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false },
+            { id: 'vid-group-3', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false },
+            { id: 'vid-single-1', type: 'single1', syncStatus: 'cloud', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false },
+            { id: 'vid-single-2', type: 'single2', syncStatus: 'cloud', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false }
+        ]
+    };
+
+    const SYNC_LABELS = { device_only: '仅设备', local: '仅本地', cloud: '' };
+
+    // 任务状态与阶段（多视频上云分析）
+    const TASK_STATUS = { pending: 'pending', transferring: 'transferring', uploading: 'uploading', analyzing: 'analyzing', success: 'success', failed: 'failed' };
+    const TASK_PHASE_LABELS = {
+        pending: '等待中',
+        transferring: '本地传输中',
+        uploading: '上云中',
+        analyzing: '分析中',
+        success: '分析完成',
+        failed: '失败'
+    };
+    const ERROR_MESSAGES = {
+        transfer_failed: '传输失败，请检查网络或存储',
+        upload_failed: '上云失败，请稍后重试',
+        analysis_failed: '分析服务异常，请稍后重试',
+        timeout: '请求超时，请重试',
+        network_offline: '网络已断开，请恢复后重试',
+        storage_full: '存储空间不足，请清理后重试'
+    };
+
+    let currentSelectTab = 'falcon';
+    let selectedMode = null; // 'single' or 'group'
+    let selectedVideoIds = []; // 当前选中的可分析视频 id 列表
+    let taskList = []; // 本批任务列表，每项: { id, videoId, thumb, phase, status, errorMessage, progress, groupId? }
+    var taskProgressTimer = null;
+    var currentTaskIndex = -1; // 当前执行到的任务下标（串行）
+    var expandedSegmentGroupId = null; // 当前展开的分段任务组 id，用于折叠/展开
+
+    /** 默认展示用：无任务时展示多个分析任务（两非分段 + 两分段组） */
+    function getDefaultDemoTaskList() {
+        var thumb = 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80';
+        var thumb2 = 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80';
+        var base = [
+            { id: 'demo-whole-1', videoId: 'demo-whole-1', thumb: thumb2, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '整片', isSegmented: false, groupId: null, uploadTime: '2025-02-08T10:00:00', completedAt: '2025-02-08T10:05:00', duration: '05:00', fileName: '整场录像.mp4' },
+            { id: 'demo-whole-2', videoId: 'demo-whole-2', thumb: thumb2, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '单条视频', isSegmented: false, groupId: null, uploadTime: '2025-02-09T14:20:00', completedAt: '2025-02-09T14:23:00', duration: '02:30', fileName: '单条视频.mp4' },
+            { id: 'demo-seg-1', videoId: 'demo-seg-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 01', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21' },
+            { id: 'demo-seg-2', videoId: 'demo-seg-2', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 02', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31' },
+            { id: 'demo-seg-3', videoId: 'demo-seg-3', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 03', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36' },
+            { id: 'demo-seg2-1', videoId: 'demo-seg2-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 01', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21' },
+            { id: 'demo-seg2-2', videoId: 'demo-seg2-2', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 02', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31' },
+            { id: 'demo-seg2-3', videoId: 'demo-seg2-3', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 03', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36' },
+            { id: 'demo-seg-fail-1', videoId: 'demo-seg-fail-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1112 - 01', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: '2025-02-10T15:06:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21' },
+            { id: 'demo-seg-fail-2', videoId: 'demo-seg-fail-2', thumb: thumb, phase: 'uploading', status: TASK_STATUS.failed, errorMessage: ERROR_MESSAGES.upload_failed, progress: 0, displayName: '1112 - 02', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: null, duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31' },
+            { id: 'demo-seg-fail-3', videoId: 'demo-seg-fail-3', thumb: thumb, phase: 'analyzing', status: TASK_STATUS.failed, errorMessage: ERROR_MESSAGES.analysis_failed, progress: 0, displayName: '1112 - 03', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: null, duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36' }
+        ];
+        return base;
+    }
+
+    var currentDetailContext = {
+        isDemo: false,
+        groupId: null,
+        taskId: null
+    };
+
+    function navTo(pageId) {
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.remove('active');
+            p.classList.add('hidden');
+        });
+        document.getElementById(pageId).classList.remove('hidden');
+        document.getElementById(pageId).classList.add('active');
+        
+        if (pageId === 'page-select') {
+            resetSelection();
+            renderSelectGrid(currentSelectTab);
+        }
+        if (pageId === 'page-task-list') {
+            renderTaskList();
+        }
+        if (pageId === 'page-task-detail') {
+            renderTaskDetail();
+        }
+    }
+
+    function resetSelection() {
+        const container = document.getElementById('select-video-grid-container');
+        if (container) container.querySelectorAll('.video-card').forEach(el => el.classList.remove('selected'));
+        const btn = document.getElementById('btn-start');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Select a Video';
+        }
+        selectedMode = null;
+        selectedVideoIds = [];
+    }
+
+    function showToast() {
+        const toast = document.getElementById('toast-sync');
+        if (!toast) return;
+        toast.classList.add('show');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => { toast.classList.remove('show'); }, 2500);
+    }
+
+    function showToastMessage(msg) {
+        const toast = document.getElementById('toast-message');
+        if (!toast) return;
+        toast.textContent = msg || '';
+        toast.classList.add('show');
+        clearTimeout(window._toastMsgTimer);
+        window._toastMsgTimer = setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+
+    function renderSelectGrid(tab) {
+        currentSelectTab = tab;
+        document.querySelectorAll('.segment-tabs .seg-tab').forEach(t => {
+            t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+        });
+
+        const list = VIDEO_LISTS[tab] || [];
+        const byDate = {};
+        list.forEach(v => {
+            if (!byDate[v.date]) byDate[v.date] = [];
+            byDate[v.date].push(v);
+        });
+        const dates = Object.keys(byDate).sort().reverse();
+
+        const container = document.getElementById('select-video-grid-container');
+        container.innerHTML = '';
+
+        dates.forEach(date => {
+            const div = document.createElement('div');
+            div.className = 'date-divider';
+            div.textContent = date;
+            container.appendChild(div);
+
+            const grid = document.createElement('div');
+            grid.className = 'video-grid';
+            byDate[date].forEach(v => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.id = v.id;
+                card.setAttribute('data-type', v.type);
+                card.setAttribute('data-sync-status', v.syncStatus);
+                card.onclick = () => handleClick(v.type, v.syncStatus, v.id);
+                card.innerHTML =
+                    (v.syncStatus !== 'cloud' ? '<span class="sync-badge">' + (SYNC_LABELS[v.syncStatus] || '未同步') + '</span>' : '') +
+                    '<div class="video-thumb" style="background-image:url(' + v.thumb + ');' + (v.filter ? ' filter:' + v.filter : '') + '"></div>' +
+                    (v.isGroupFirst ? '<div class="group-icon"><svg viewBox="0 0 24 24"><path d="M3 17h18v2H3zm0-7h18v5H3zm0-4h18v2H3z"/></svg></div>' : '') +
+                    '<div class="check-circle"><svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg></div>' +
+                    '<div class="meta-badge">' + v.duration + '</div>';
+                grid.appendChild(card);
+            });
+            container.appendChild(grid);
+        });
+        updateStartButton();
+    }
+
+    function updateStartButton() {
+        const btn = document.getElementById('btn-start');
+        if (!btn) return;
+        const anySelected = selectedVideoIds.length > 0;
+        btn.disabled = !anySelected;
+        if (selectedMode === 'group') btn.innerText = 'Start Analysis (3 Clips)';
+        else if (selectedMode === 'single') btn.innerText = 'Start Analysis (1 Clip)';
+        else btn.innerText = 'Select a Video';
+    }
+
+    function handleClick(type, syncStatus, id) {
+        if (type === 'group') {
+            document.getElementById('modal-merge').classList.add('show');
+        } else {
+            resetSelection();
+            const singleId = type === 'single1' ? 'vid-single-1' : 'vid-single-2';
+            const el = document.getElementById(singleId);
+            if (el) el.classList.add('selected');
+            selectedVideoIds = [singleId];
+            selectedMode = 'single';
+            updateStartButton();
+        }
+    }
+
+    function confirmMerge() {
+        document.getElementById('modal-merge').classList.remove('show');
+        selectedVideoIds = ['vid-group-1', 'vid-group-2', 'vid-group-3'];
+        selectedMode = 'group';
+        ['vid-group-1', 'vid-group-2', 'vid-group-3'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('selected');
+        });
+        setTimeout(() => navTo('page-sequence'), 400);
+    }
+
+    function cancelMerge() {
+        document.getElementById('modal-merge').classList.remove('show');
+    }
+
+    function handleStart() {
+        if (selectedMode === 'single') startLoading();
+    }
+
+    function needsSync() {
+        const list = VIDEO_LISTS[currentSelectTab] || [];
+        return selectedVideoIds.some(function (id) {
+            const v = list.find(function (x) { return x.id === id; });
+            return v && v.syncStatus !== 'cloud';
+        });
+    }
+
+    function setLoadingPhase(title, sub) {
+        var el = document.getElementById('loading-text');
+        var subEl = document.getElementById('loading-sub');
+        if (el) el.textContent = title;
+        if (subEl) subEl.textContent = sub || '';
+    }
+
+    function getFirstSelectedThumb() {
+        var list = VIDEO_LISTS[currentSelectTab] || [];
+        var id = selectedVideoIds[0];
+        if (!id) return '';
+        var v = list.find(function (x) { return x.id === id; });
+        return (v && v.thumb) ? v.thumb : '';
+    }
+
+    function buildTaskList() {
+        var list = VIDEO_LISTS[currentSelectTab] || [];
+        var now = new Date().toISOString();
+        taskList = selectedVideoIds.map(function (videoId, idx) {
+            var v = list.find(function (x) { return x.id === videoId; });
+            var type = (v && v.type) ? v.type : '';
+            var isSegmented = type === 'group';
+            var displayName;
+            if (type === 'group') {
+                displayName = '1029 - ' + String(idx + 1).padStart(2, '0');
+            } else if (type === 'single1' || type === 'single2') {
+                displayName = '整片';
+            } else {
+                displayName = (v && v.id) ? v.id : 'task-' + (idx + 1);
+            }
+            return {
+                id: 'task-' + (idx + 1),
+                videoId: videoId,
+                thumb: (v && v.thumb) ? v.thumb : '',
+                phase: 'transferring',
+                status: TASK_STATUS.pending,
+                errorMessage: '',
+                progress: 0,
+                displayName: displayName,
+                isSegmented: isSegmented,
+                groupId: isSegmented ? 'segmented-1' : null,
+                uploadTime: now,
+                completedAt: null,
+                duration: (v && v.duration) ? v.duration : '',
+                segmentIndex: null,
+                segmentTotal: null,
+                startTime: null,
+                endTime: null,
+                fileName: null
+            };
+        });
+        // 分段任务：设置 segmentIndex / segmentTotal
+        var byGroup = {};
+        taskList.forEach(function (t) {
+            if (t.groupId) {
+                if (!byGroup[t.groupId]) byGroup[t.groupId] = [];
+                byGroup[t.groupId].push(t);
+            }
+        });
+        Object.keys(byGroup).forEach(function (gid) {
+            var arr = byGroup[gid];
+            arr.forEach(function (t, i) {
+                t.segmentIndex = i + 1;
+                t.segmentTotal = arr.length;
+            });
+        });
+        currentTaskIndex = -1;
+    }
+
+    function getCurrentRunningTask() {
+        for (var i = 0; i < taskList.length; i++) {
+            var s = taskList[i].status;
+            if (s === TASK_STATUS.transferring || s === TASK_STATUS.uploading || s === TASK_STATUS.analyzing) return taskList[i];
+        }
+        return null;
+    }
+
+    function getFirstPendingTask() {
+        for (var i = 0; i < taskList.length; i++) {
+            if (taskList[i].status === TASK_STATUS.pending) return taskList[i];
+        }
+        return null;
+    }
+
+    function isAllDone() {
+        for (var i = 0; i < taskList.length; i++) {
+            var s = taskList[i].status;
+            if (s === TASK_STATUS.pending || s === TASK_STATUS.transferring || s === TASK_STATUS.uploading || s === TASK_STATUS.analyzing) return false;
+        }
+        return true;
+    }
+
+    function countSuccessAndFailed() {
+        var ok = 0, fail = 0;
+        taskList.forEach(function (t) {
+            if (t.status === TASK_STATUS.success) ok++;
+            else if (t.status === TASK_STATUS.failed) fail++;
+        });
+        return { success: ok, failed: fail };
+    }
+
+    function renderTaskList() {
+        var isDemo = taskList.length === 0;
+        if (isDemo) {
+            if (!window._demoTaskList) window._demoTaskList = getDefaultDemoTaskList();
+        }
+        var listToRender = isDemo ? window._demoTaskList : taskList;
+
+        var counts = isDemo ? (function () {
+            var ok = 0, fail = 0;
+            listToRender.forEach(function (t) {
+                if (t.status === TASK_STATUS.success) ok++;
+                else if (t.status === TASK_STATUS.failed) fail++;
+            });
+            return { success: ok, failed: fail };
+        }()) : countSuccessAndFailed();
+        var allDone = isDemo ? (function () {
+            for (var i = 0; i < listToRender.length; i++) {
+                var s = listToRender[i].status;
+                if (s === TASK_STATUS.pending || s === TASK_STATUS.transferring || s === TASK_STATUS.uploading || s === TASK_STATUS.analyzing) return false;
+            }
+            return true;
+        }()) : isAllDone();
+        var allSuccess = counts.failed === 0 && allDone && listToRender.length > 0;
+        var total = listToRender.length;
+        var completed = counts.success;
+
+        var fractionEl = document.getElementById('task-progress-fraction');
+        var labelEl = document.getElementById('task-progress-label');
+        var fillEl = document.getElementById('task-top-progress-fill');
+        if (fractionEl) fractionEl.textContent = completed + '/' + total;
+        if (labelEl) labelEl.textContent = '视频片段已完成分析';
+        if (fillEl) fillEl.style.width = (total ? (completed / total) * 100 : 0) + '%';
+
+        var running = getCurrentRunningTask();
+        var firstPending = getFirstPendingTask();
+        var current = isDemo ? null : (running || firstPending);
+
+        var wrap = document.getElementById('task-current-wrap');
+        var currentItem = document.getElementById('task-current-item');
+        if (wrap && currentItem) {
+            if (current) {
+                wrap.style.display = 'block';
+                var titleEl = document.getElementById('task-current-title');
+                var thumbEl = document.getElementById('task-current-thumb');
+                var statusEl = document.getElementById('task-current-status');
+                var pctEl = document.getElementById('task-current-pct');
+                var dotEl = document.getElementById('task-current-dot');
+                var timeEl = document.getElementById('task-current-time');
+                var viewBtn = document.getElementById('task-current-view');
+                if (titleEl) titleEl.textContent = current.displayName != null ? current.displayName : (current.videoId || current.id);
+                if (thumbEl) thumbEl.style.backgroundImage = current.thumb ? 'url(' + current.thumb + ')' : 'none';
+                var durationEl = document.getElementById('task-current-duration');
+                if (durationEl) {
+                    if (current.duration) { durationEl.textContent = current.duration; durationEl.style.display = 'block'; } else { durationEl.textContent = ''; durationEl.style.display = 'none'; }
+                }
+                if (statusEl) statusEl.textContent = '• ' + (TASK_PHASE_LABELS[current.status] || current.status);
+                if (pctEl) pctEl.textContent = (current.progress >= 0 && current.progress <= 100) ? ' (' + current.progress + '%)' : '';
+                if (dotEl) {
+                    dotEl.classList.remove('red', 'green');
+                    dotEl.classList.add(current.status === TASK_STATUS.failed ? 'red' : 'green');
+                }
+                if (timeEl) timeEl.textContent = '开始分析: ' + formatTaskTimeShort(current.uploadTime || new Date());
+                if (viewBtn) {
+                    var canView = current.status === TASK_STATUS.success && allSuccess;
+                    viewBtn.style.display = canView ? 'block' : 'none';
+                    viewBtn.disabled = !canView;
+                    viewBtn.className = 'task-item-view ' + (canView ? 'done' : 'pending');
+                    viewBtn.textContent = '查看';
+                    viewBtn.onclick = canView ? function () { renderResult(); navTo('page-result'); } : null;
+                }
+                currentItem.classList.remove('failed');
+            } else {
+                wrap.style.display = 'none';
+            }
+        }
+
+        var listEl = document.getElementById('task-completed-list');
+        if (listEl) {
+            listEl.innerHTML = '';
+            // 按上传/完成时间倒序，最新在前
+            var sorted = listToRender.slice().sort(function (a, b) {
+                var ta = a.completedAt || a.uploadTime;
+                var tb = b.completedAt || b.uploadTime;
+                if (!ta && !tb) return 0;
+                if (!ta) return 1;
+                if (!tb) return -1;
+                var da = typeof ta === 'string' ? new Date(ta).getTime() : (ta && ta.getTime ? ta.getTime() : 0);
+                var db = typeof tb === 'string' ? new Date(tb).getTime() : (tb && tb.getTime ? tb.getTime() : 0);
+                return db - da;
+            });
+            // 按分段/非分段分组：分段任务（同一 groupId）合并为可折叠块，非分段各为单条
+            var blocks = [];
+            for (var i = 0; i < sorted.length; i++) {
+                var t = sorted[i];
+                if (t.groupId) {
+                    var segTasks = [];
+                    while (i < sorted.length && sorted[i].groupId === t.groupId) {
+                        segTasks.push(sorted[i]);
+                        i++;
+                    }
+                    i--;
+                    blocks.push({ isSegmented: true, groupId: t.groupId, tasks: segTasks });
+                } else {
+                    blocks.push({ isSegmented: false, tasks: [t] });
+                }
+            }
+
+            function appendTaskCard(container, t, options) {
+                options = options || {};
+                var showViewButton = options.showViewButton !== false;
+                var isSegmentItem = options.segmentIndex != null;
+                var div = document.createElement('div');
+                div.className = 'task-item' + (t.status === TASK_STATUS.failed ? ' failed' : '');
+                div.setAttribute('data-task-id', t.id);
+                var title = (t.fileName != null ? t.fileName : (t.displayName != null ? t.displayName : t.videoId)) || t.id;
+                var durationHtml = (t.duration ? '<span class="task-item-duration-badge">' + (t.duration + '').replace(/</g, '&lt;') + '</span>' : '');
+                var timeLine = '开始: ' + formatTaskTimeShort(t.uploadTime);
+                if (t.status === TASK_STATUS.success && t.completedAt) timeLine += ' · 完成: ' + formatTaskTimeShort(t.completedAt);
+                var segmentMetaHtml = '';
+                if (isSegmentItem && (t.segmentIndex != null || (t.startTime && t.endTime))) {
+                    var parts = [];
+                    if (t.segmentIndex != null) parts.push('第 ' + t.segmentIndex + ' 段');
+                    if (t.startTime && t.endTime) parts.push(t.startTime + ' - ' + t.endTime);
+                    if (parts.length) segmentMetaHtml = '<div class="task-item-segment-meta">' + parts.join(' · ').replace(/</g, '&lt;') + '</div>';
+                }
+                div.innerHTML =
+                    '<div class="task-item-thumb-wrap">' +
+                    '<div class="task-item-thumb" style="background-image:url(' + (t.thumb || '') + ')"></div>' + durationHtml + '</div>' +
+                    '<div class="task-item-body">' +
+                    '<div class="task-item-title">' + (title || '').replace(/</g, '&lt;') + '</div>' +
+                    (segmentMetaHtml || '') +
+                    '<div class="task-item-status">' +
+                    '<span class="task-item-dot ' + (t.status === TASK_STATUS.success ? 'green' : t.status === TASK_STATUS.failed ? 'red' : 'green') + '"></span>' +
+                    '<span>' + (t.status === TASK_STATUS.failed ? (t.errorMessage || '失败') : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
+                    (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
+                    '</div>' +
+                    '<div class="task-item-tag">篮球</div>' +
+                    (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
+                    '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
+                    '</div>';
+                if (t.status === TASK_STATUS.failed) {
+                    var retryBtn = document.createElement('button');
+                    retryBtn.className = 'task-item-retry';
+                    retryBtn.textContent = '重试';
+                    retryBtn.onclick = function () { retryAllFailed(); };
+                    div.appendChild(retryBtn);
+                } else if (showViewButton && t.status === TASK_STATUS.success && allSuccess) {
+                    var viewBtn = document.createElement('button');
+                    viewBtn.className = 'task-item-view done';
+                    viewBtn.textContent = '查看';
+                    viewBtn.onclick = function () { renderResult(); navTo('page-result'); };
+                    div.appendChild(viewBtn);
+                }
+                container.appendChild(div);
+            }
+
+            function appendUnifiedTaskCard(container, block) {
+                if (!block || !block.tasks || block.tasks.length === 0) return;
+                var isSegmentedBlock = !!block.isSegmented;
+                var tasks = block.tasks.slice();
+                var mainTask = tasks[0];
+                var hasFailure = tasks.some(function (x) { return x.status === TASK_STATUS.failed; });
+                var segCompleted = tasks.filter(function (x) { return x.status === TASK_STATUS.success; }).length;
+                var segTotal = tasks.length;
+                var segAllSuccess = segCompleted === segTotal && segTotal > 0 && !hasFailure;
+
+                var title = (mainTask.fileName != null ? mainTask.fileName : (mainTask.displayName != null ? mainTask.displayName : mainTask.videoId)) || mainTask.id;
+                var labelText = isSegmentedBlock ? '分段' : '整段';
+
+                var statusLabel;
+                var statusDotClass;
+                if (isSegmentedBlock) {
+                    if (hasFailure) {
+                        statusLabel = '部分失败';
+                        statusDotClass = 'red';
+                    } else if (segAllSuccess) {
+                        statusLabel = '分析完成';
+                        statusDotClass = 'green';
+                    } else {
+                        statusLabel = '分析中';
+                        statusDotClass = 'green';
+                    }
+                } else {
+                    if (mainTask.status === TASK_STATUS.failed) {
+                        statusLabel = TASK_PHASE_LABELS.failed || '失败';
+                        statusDotClass = 'red';
+                    } else if (mainTask.status === TASK_STATUS.success) {
+                        statusLabel = '分析完成';
+                        statusDotClass = 'green';
+                    } else {
+                        statusLabel = TASK_PHASE_LABELS[mainTask.status] || '等待中';
+                        statusDotClass = 'green';
+                    }
+                }
+
+                var subtitleText;
+                if (isSegmentedBlock) {
+                    subtitleText = segTotal ? (segTotal + ' 段 · 已完成 ' + segCompleted + '/' + segTotal) : '分段任务';
+                } else {
+                    subtitleText = '单段视频';
+                }
+
+                var firstSeg = tasks[0];
+                var lastSeg = tasks[tasks.length - 1];
+                var timeRangeText = '';
+                if (isSegmentedBlock) {
+                    if (firstSeg && firstSeg.startTime && lastSeg && lastSeg.endTime) {
+                        timeRangeText = firstSeg.startTime + ' - ' + lastSeg.endTime;
+                    } else if (mainTask.duration) {
+                        timeRangeText = mainTask.duration;
+                    }
+                } else if (mainTask.duration) {
+                    timeRangeText = mainTask.duration;
+                }
+
+                var startTimeLabel = mainTask.uploadTime ? formatTaskTimeShort(mainTask.uploadTime) : '--';
+                var endTimeLabel = (mainTask.status === TASK_STATUS.success && mainTask.completedAt) ? formatTaskTimeShort(mainTask.completedAt) : null;
+                var metaTimeLine = '开始 ' + startTimeLabel + (endTimeLabel ? ' · 完成 ' + endTimeLabel : '');
+
+                var progressLabel = '';
+                var progressPct = 0;
+                if (isSegmentedBlock) {
+                    progressLabel = segTotal ? (segCompleted + '/' + segTotal + ' 段已完成分析') : '';
+                    progressPct = segTotal ? (segCompleted / segTotal) * 100 : 0;
+                } else {
+                    if (mainTask.status === TASK_STATUS.success) {
+                        progressPct = 100;
+                    } else if (typeof mainTask.progress === 'number') {
+                        progressPct = Math.max(0, Math.min(100, mainTask.progress));
+                    }
+                }
+
+                var goResultDirect = false;
+                var btnLabel;
+                if (isSegmentedBlock) {
+                    if (segAllSuccess && allSuccess) {
+                        btnLabel = '查看结果';
+                        goResultDirect = true;
+                    } else {
+                        btnLabel = '查看进度';
+                    }
+                } else {
+                    if (mainTask.status === TASK_STATUS.success && allSuccess) {
+                        btnLabel = '查看结果';
+                        goResultDirect = true;
+                    } else {
+                        btnLabel = '查看进度';
+                    }
+                }
+
+                var card = document.createElement('div');
+                card.className = 'task-card';
+                if (isSegmentedBlock) {
+                    card.setAttribute('data-group-id', block.groupId);
+                } else {
+                    card.setAttribute('data-task-id', mainTask.id);
+                }
+
+                var durationBadgeHtml = timeRangeText ? '<span class="task-item-duration-badge">' + (timeRangeText + '').replace(/</g, '&lt;') + '</span>' : '';
+                var thumbUrl = (mainTask.thumb || '');
+                card.innerHTML =
+                    '<div class="task-card-header">' +
+                    '<div class="task-card-title-row">' +
+                    '<span class="task-card-title">' + (title || '').replace(/</g, '&lt;') + '</span>' +
+                    '<span class="task-card-type-tag">' + labelText + '</span>' +
+                    '</div>' +
+                    '<div class="task-card-status-row">' +
+                    '<span class="task-item-dot ' + statusDotClass + '"></span>' +
+                    '<span class="task-card-status-text">' + (statusLabel || '').replace(/</g, '&lt;') + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="task-card-main">' +
+                    '<div class="task-item-thumb-wrap">' +
+                    '<div class="task-item-thumb" style="background-image:url(' + thumbUrl + ')"></div>' +
+                    durationBadgeHtml +
+                    '</div>' +
+                    '<div class="task-card-main-right">' +
+                    '<div class="task-card-subtitle">' + (subtitleText || '').replace(/</g, '&lt;') + '</div>' +
+                    (timeRangeText ? '<div class="task-card-time-range">' + (timeRangeText + '').replace(/</g, '&lt;') + '</div>' : '') +
+                    '<div class="task-card-meta-time">' + metaTimeLine.replace(/</g, '&lt;') + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="task-card-bottom">' +
+                    '<div class="task-card-bottom-left">' +
+                    (progressLabel ? '<div class="task-card-progress-text">' + progressLabel.replace(/</g, '&lt;') + '</div>' : '') +
+                    '<div class="task-card-progress-bar"><div class="task-card-progress-fill" style="width:' + progressPct + '%"></div></div>' +
+                    '</div>' +
+                    '<button type="button" class="task-card-btn' + (goResultDirect ? '' : ' secondary') + '">' + btnLabel + '</button>' +
+                    '</div>';
+
+                card.addEventListener('click', function () {
+                    openTaskDetailForBlock(block, isDemo);
+                });
+                var btnEl = card.querySelector('.task-card-btn');
+                if (btnEl) {
+                    btnEl.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        if (goResultDirect) {
+                            renderResult();
+                            navTo('page-result');
+                        } else {
+                            openTaskDetailForBlock(block, isDemo);
+                        }
+                    });
+                }
+                container.appendChild(card);
+            }
+
+            blocks.forEach(function (block) {
+                appendUnifiedTaskCard(listEl, block);
+            });
+        }
+
+        var summaryWrap = document.getElementById('task-summary-wrap');
+        var btnPrimary = document.getElementById('btn-task-primary');
+        if (summaryWrap) summaryWrap.style.display = 'none';
+        if (btnPrimary) {
+            btnPrimary.textContent = '选择视频';
+            btnPrimary.onclick = function () { navTo('page-select'); };
+        }
+    }
+
+    function toggleSegmentGroup(groupId) {
+        // 旧的折叠行为在新设计中不再使用，保留空实现以兼容已有调用
+        expandedSegmentGroupId = expandedSegmentGroupId === groupId ? null : groupId;
+    }
+
+    function getTaskSourceList(isDemoSource) {
+        if (isDemoSource) {
+            if (!window._demoTaskList) window._demoTaskList = getDefaultDemoTaskList();
+            return window._demoTaskList || [];
+        }
+        return taskList || [];
+    }
+
+    function openTaskDetailForBlock(block, isDemoSource) {
+        if (!block || !block.tasks || block.tasks.length === 0) return;
+        currentDetailContext.isDemo = !!isDemoSource;
+        if (block.isSegmented) {
+            currentDetailContext.groupId = block.groupId;
+            currentDetailContext.taskId = null;
+        } else {
+            currentDetailContext.groupId = null;
+            currentDetailContext.taskId = block.tasks[0].id;
+        }
+        navTo('page-task-detail');
+    }
+
+    function renderTaskDetail() {
+        var source = getTaskSourceList(currentDetailContext.isDemo);
+        var titleEl = document.getElementById('task-detail-title');
+        var headerEl = document.getElementById('task-detail-header');
+        var listEl = document.getElementById('task-detail-list');
+        var sectionTitleEl = document.getElementById('task-detail-section-title');
+        var primaryBtn = document.getElementById('btn-task-detail-primary');
+        if (!listEl || !headerEl || !titleEl || !primaryBtn) return;
+
+        listEl.innerHTML = '';
+        headerEl.style.display = 'none';
+        sectionTitleEl.style.display = 'none';
+
+        var isSegmentDetail = !!currentDetailContext.groupId;
+        var tasks;
+        if (isSegmentDetail) {
+            tasks = source.filter(function (t) { return t.groupId === currentDetailContext.groupId; });
+        } else if (currentDetailContext.taskId) {
+            tasks = source.filter(function (t) { return t.id === currentDetailContext.taskId; });
+        } else {
+            tasks = [];
+        }
+        if (!tasks || tasks.length === 0) {
+            titleEl.textContent = '任务详情';
+            primaryBtn.textContent = '返回任务列表';
+            primaryBtn.onclick = function () { navTo('page-task-list'); };
+            return;
+        }
+
+        var mainTask = tasks[0];
+        var title = (mainTask.fileName != null ? mainTask.fileName : (mainTask.displayName != null ? mainTask.displayName : mainTask.videoId)) || mainTask.id;
+        var isSegmented = !!mainTask.isSegmented || isSegmentDetail;
+
+        // 头部摘要
+        var startTimeLabel = mainTask.uploadTime ? formatTaskTimeShort(mainTask.uploadTime) : '--';
+        var lastCompleted = tasks.reduce(function (acc, t) {
+            if (t.completedAt) {
+                var cur = new Date(t.completedAt).getTime();
+                if (!acc.time || cur > acc.time) acc = { time: cur, label: formatTaskTimeShort(t.completedAt) };
+            }
+            return acc;
+        }, { time: null, label: null });
+        var summaryLines = [];
+        summaryLines.push('开始 ' + startTimeLabel + (lastCompleted.label ? ' · 完成 ' + lastCompleted.label : ''));
+        if (isSegmentDetail && tasks.length > 1) {
+            var segCompleted = tasks.filter(function (x) { return x.status === TASK_STATUS.success; }).length;
+            var segTotal = tasks.length;
+            summaryLines.push(segCompleted + '/' + segTotal + ' 段已完成分析');
+        }
+        headerEl.innerHTML =
+            '<strong>' + (title || '').replace(/</g, '&lt;') + '</strong>' +
+            '<p class="task-summary-hint" style="margin-top:6px;">' +
+            summaryLines.join(' · ').replace(/</g, '&lt;') +
+            '</p>';
+        headerEl.style.display = 'block';
+
+        titleEl.textContent = isSegmentDetail ? '分段任务详情' : '任务详情';
+
+        // 列表：分段任务展示每一段，非分段只展示单条
+        if (isSegmentDetail) {
+            sectionTitleEl.style.display = 'block';
+            tasks
+                .slice()
+                .sort(function (a, b) {
+                    return (a.segmentIndex || 0) - (b.segmentIndex || 0);
+                })
+                .forEach(function (t) {
+                    appendTaskItemForDetail(listEl, t);
+                });
+        } else {
+            appendTaskItemForDetail(listEl, mainTask);
+        }
+
+        var allSuccess = tasks.length > 0 && tasks.every(function (t) { return t.status === TASK_STATUS.success; });
+        if (allSuccess) {
+            primaryBtn.textContent = '查看结果';
+            primaryBtn.onclick = function () {
+                renderResult();
+                navTo('page-result');
+            };
+        } else {
+            primaryBtn.textContent = '返回任务列表';
+            primaryBtn.onclick = function () { navTo('page-task-list'); };
+        }
+    }
+
+    function appendTaskItemForDetail(container, t) {
+        if (!container || !t) return;
+        var div = document.createElement('div');
+        div.className = 'task-item' + (t.status === TASK_STATUS.failed ? ' failed' : '');
+        var title = (t.fileName != null ? t.fileName : (t.displayName != null ? t.displayName : t.videoId)) || t.id;
+        var durationHtml = (t.duration ? '<span class="task-item-duration-badge">' + (t.duration + '').replace(/</g, '&lt;') + '</span>' : '');
+        var timeLine = '开始: ' + formatTaskTimeShort(t.uploadTime);
+        if (t.status === TASK_STATUS.success && t.completedAt) timeLine += ' · 完成: ' + formatTaskTimeShort(t.completedAt);
+        var segmentMetaHtml = '';
+        if (t.segmentIndex != null || (t.startTime && t.endTime)) {
+            var parts = [];
+            if (t.segmentIndex != null && t.segmentTotal != null) parts.push('第 ' + t.segmentIndex + '/' + t.segmentTotal + ' 段');
+            else if (t.segmentIndex != null) parts.push('第 ' + t.segmentIndex + ' 段');
+            if (t.startTime && t.endTime) parts.push(t.startTime + ' - ' + t.endTime);
+            if (parts.length) segmentMetaHtml = '<div class="task-item-segment-meta">' + parts.join(' · ').replace(/</g, '&lt;') + '</div>';
+        }
+        div.innerHTML =
+            '<div class="task-item-thumb-wrap">' +
+            '<div class="task-item-thumb" style="background-image:url(' + (t.thumb || '') + ')"></div>' + durationHtml + '</div>' +
+            '<div class="task-item-body">' +
+            '<div class="task-item-title">' + (title || '').replace(/</g, '&lt;') + '</div>' +
+            segmentMetaHtml +
+            '<div class="task-item-status">' +
+            '<span class="task-item-dot ' + (t.status === TASK_STATUS.success ? 'green' : t.status === TASK_STATUS.failed ? 'red' : 'green') + '"></span>' +
+            '<span>' + (t.status === TASK_STATUS.failed ? (t.errorMessage || '失败') : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
+            (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
+            '</div>' +
+            '<div class="task-item-tag">篮球</div>' +
+            (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
+            '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
+            '</div>';
+        if (t.status === TASK_STATUS.success) {
+            var viewBtn = document.createElement('button');
+            viewBtn.className = 'task-item-view done';
+            viewBtn.textContent = '查看';
+            viewBtn.onclick = function () { renderResult(); navTo('page-result'); };
+            div.appendChild(viewBtn);
+        } else if (t.status === TASK_STATUS.failed) {
+            var retryBtn = document.createElement('button');
+            retryBtn.className = 'task-item-retry';
+            retryBtn.textContent = '重试';
+            retryBtn.onclick = function () { retryTask(t.id); };
+            div.appendChild(retryBtn);
+        }
+        container.appendChild(div);
+    }
+
+    function viewResultWithSuccess() {
+        renderResult();
+        navTo('page-result');
+    }
+
+    var demoRetryTimer = null;
+
+    function runDemoRetryPhases(task, onDone) {
+        var phaseKeys = ['transferring', 'uploading', 'analyzing'];
+        var phaseIndex = 0;
+        var durationMs = 1200;
+        function runPhase() {
+            if (phaseIndex >= phaseKeys.length) {
+                if (demoRetryTimer) clearInterval(demoRetryTimer);
+                demoRetryTimer = null;
+                task.status = TASK_STATUS.success;
+                task.phase = 'success';
+                task.progress = 100;
+                task.errorMessage = '';
+                task.completedAt = task.completedAt || new Date().toISOString();
+                renderTaskList();
+                if (onDone) onDone();
+                return;
+            }
+            var phaseKey = phaseKeys[phaseIndex];
+            var phaseStatus = phaseKey === 'transferring' ? TASK_STATUS.transferring : phaseKey === 'uploading' ? TASK_STATUS.uploading : TASK_STATUS.analyzing;
+            task.status = phaseStatus;
+            task.phase = phaseKey;
+            task.progress = 0;
+            renderTaskList();
+            var start = Date.now();
+            if (demoRetryTimer) clearInterval(demoRetryTimer);
+            demoRetryTimer = setInterval(function () {
+                var elapsed = Date.now() - start;
+                var pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
+                task.progress = pct;
+                renderTaskList();
+                if (pct >= 100) {
+                    clearInterval(demoRetryTimer);
+                    demoRetryTimer = null;
+                    phaseIndex++;
+                    runPhase();
+                }
+            }, 120);
+        }
+        runPhase();
+    }
+
+    function retryTask(taskId) {
+        var t = taskList.find(function (x) { return x.id === taskId; });
+        if (t && t.status === TASK_STATUS.failed) {
+            t.status = TASK_STATUS.pending;
+            t.phase = 'transferring';
+            t.errorMessage = '';
+            t.progress = 0;
+            renderTaskList();
+            runNextTask();
+            return;
+        }
+        if (window._demoTaskList) {
+            t = window._demoTaskList.find(function (x) { return x.id === taskId; });
+            if (t && t.status === TASK_STATUS.failed) {
+                t.status = TASK_STATUS.pending;
+                t.phase = 'transferring';
+                t.errorMessage = '';
+                t.progress = 0;
+                renderTaskList();
+                runDemoRetryPhases(t);
+            }
+        }
+    }
+
+    function retryAllFailed() {
+        if (taskList.length > 0) {
+            var any = false;
+            taskList.forEach(function (t) {
+                if (t.status === TASK_STATUS.failed) {
+                    t.status = TASK_STATUS.pending;
+                    t.phase = 'transferring';
+                    t.errorMessage = '';
+                    t.progress = 0;
+                    any = true;
+                }
+            });
+            if (any) {
+                renderTaskList();
+                runNextTask();
+            }
+            return;
+        }
+        if (window._demoTaskList) {
+            var failedList = window._demoTaskList.filter(function (t) { return t.status === TASK_STATUS.failed; });
+            failedList.forEach(function (t) {
+                t.status = TASK_STATUS.pending;
+                t.phase = 'transferring';
+                t.errorMessage = '';
+                t.progress = 0;
+            });
+            if (failedList.length === 0) return;
+            renderTaskList();
+            function runNext(i) {
+                if (i >= failedList.length) return;
+                runDemoRetryPhases(failedList[i], function () { runNext(i + 1); });
+            }
+            runNext(0);
+        }
+    }
+
+    function formatTaskTime(date) {
+        var y = date.getFullYear();
+        var m = String(date.getMonth() + 1).padStart(2, '0');
+        var d = String(date.getDate()).padStart(2, '0');
+        var h = String(date.getHours()).padStart(2, '0');
+        var min = String(date.getMinutes()).padStart(2, '0');
+        return y + '-' + m + '-' + d + ' ' + h + ':' + min;
+    }
+
+    /** 列表展示用：MM-DD HH:mm，用于「开始」「完成」时间 */
+    function formatTaskTimeShort(val) {
+        if (val == null) return '--';
+        var date = typeof val === 'string' ? new Date(val) : val;
+        if (isNaN(date.getTime())) return '--';
+        var m = String(date.getMonth() + 1).padStart(2, '0');
+        var d = String(date.getDate()).padStart(2, '0');
+        var h = String(date.getHours()).padStart(2, '0');
+        var min = String(date.getMinutes()).padStart(2, '0');
+        return m + '-' + d + ' ' + h + ':' + min;
+    }
+
+    function setTaskCurrentStatus(label, pct) {
+        var statusEl = document.getElementById('task-current-status');
+        var pctEl = document.getElementById('task-current-pct');
+        var dotEl = document.getElementById('task-current-dot');
+        if (statusEl) statusEl.textContent = label;
+        if (pctEl) pctEl.textContent = (pct >= 0 && pct <= 100) ? ' (' + pct + '%)' : '';
+        if (dotEl) {
+            dotEl.classList.remove('red', 'green');
+            dotEl.classList.add(pct >= 0 && pct < 100 ? 'green' : 'red');
+        }
+    }
+
+    function runTaskPhaseForTask(taskIndex, phaseKey, durationMs, next) {
+        var task = taskList[taskIndex];
+        if (!task || task.status === TASK_STATUS.failed) { if (next) next(); return; }
+        var phaseStatus = phaseKey === 'transferring' ? TASK_STATUS.transferring : phaseKey === 'uploading' ? TASK_STATUS.uploading : TASK_STATUS.analyzing;
+        task.status = phaseStatus;
+        task.phase = phaseKey;
+        task.progress = 0;
+        renderTaskList();
+        var start = Date.now();
+        function tick() {
+            if (task.status === TASK_STATUS.failed) return;
+            var elapsed = Date.now() - start;
+            var pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
+            task.progress = pct;
+            renderTaskList();
+            if (pct >= 100) {
+                if (taskProgressTimer) clearInterval(taskProgressTimer);
+                taskProgressTimer = null;
+                if (next) next();
+            }
+        }
+        tick();
+        if (taskProgressTimer) clearInterval(taskProgressTimer);
+        taskProgressTimer = setInterval(tick, 120);
+    }
+
+    function runNextTask() {
+        var idx = -1;
+        for (var i = 0; i < taskList.length; i++) {
+            if (taskList[i].status === TASK_STATUS.pending) { idx = i; break; }
+        }
+        if (idx === -1) {
+            renderTaskList();
+            return;
+        }
+        var task = taskList[idx];
+        task.status = TASK_STATUS.transferring;
+        task.phase = 'transferring';
+        task.progress = 0;
+        renderTaskList();
+        var needsUpload = needsSync();
+        function doTransfer() {
+            runTaskPhaseForTask(idx, 'transferring', 1200, function () {
+                if (task.status === TASK_STATUS.failed) { runNextTask(); return; }
+                if (needsUpload) doUpload(); else doAnalyze();
+            });
+        }
+        function doUpload() {
+            runTaskPhaseForTask(idx, 'uploading', 1200, function () {
+                if (task.status === TASK_STATUS.failed) { runNextTask(); return; }
+                if (idx === 1) {
+                    task.status = TASK_STATUS.failed;
+                    task.errorMessage = ERROR_MESSAGES.upload_failed;
+                    showToastMessage(ERROR_MESSAGES.upload_failed);
+                    renderTaskList();
+                    runNextTask();
+                    return;
+                }
+                doAnalyze();
+            });
+        }
+        function doAnalyze() {
+            runTaskPhaseForTask(idx, 'analyzing', 1200, function () {
+                if (task.status === TASK_STATUS.failed) { runNextTask(); return; }
+                if (idx === 2) {
+                    task.status = TASK_STATUS.failed;
+                    task.errorMessage = ERROR_MESSAGES.analysis_failed;
+                    showToastMessage(ERROR_MESSAGES.analysis_failed);
+                    renderTaskList();
+                    runNextTask();
+                    return;
+                }
+                task.status = TASK_STATUS.success;
+                task.progress = 100;
+                task.completedAt = new Date().toISOString();
+                renderTaskList();
+                runNextTask();
+            });
+        }
+        if (needsUpload) doTransfer(); else doAnalyze();
+    }
+
+    function startLoading() {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            showToastMessage(ERROR_MESSAGES.network_offline);
+            return;
+        }
+        // 可选：传输前检查存储空间，不足时 showToastMessage(ERROR_MESSAGES.storage_full); return;
+        buildTaskList();
+        navTo('page-task-list');
+        renderTaskList();
+        runNextTask();
+    }
+
+    window.addEventListener('offline', function () {
+        showToastMessage(ERROR_MESSAGES.network_offline);
+    });
+
+    const HL_THUMB_DATA = [
+        { type: '2PF', time: '00:03', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=200&q=70', selected: true },
+        { type: '3PF', time: '00:09', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=200&q=70', selected: true },
+        { type: '2PF', time: '00:10', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=200&q=70', selected: false },
+        { type: '3PF', time: '00:12', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=200&q=70', selected: false },
+        { type: '2PF', time: '00:15', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=200&q=70', selected: true },
+        { type: '3PF', time: '00:18', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=200&q=70', selected: false },
+        { type: '2PF', time: '00:21', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=200&q=70', selected: false },
+        { type: '3PF', time: '00:24', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=200&q=70', selected: false },
+        { type: '2PF', time: '00:27', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=200&q=70', selected: false }
+    ];
+
+    function renderResult() {
+        const container = document.getElementById('hl-thumb-container');
+        if (!container) return;
+        container.innerHTML = '';
+        HL_THUMB_DATA.forEach(function (item) {
+            const div = document.createElement('div');
+            div.className = 'hl-thumb-item' + (item.selected ? ' selected' : '');
+            div.innerHTML = '<div class="thumb" style="background-image:url(' + item.thumb + ')"></div>' +
+                '<span class="type-tag">' + item.type + '</span>' +
+                '<span class="time-tag">' + item.time + '</span>' +
+                (item.selected ? '<span class="check">&#10003;</span>' : '');
+            container.appendChild(div);
+        });
+    }
+
+    function toggleAnalysisNote() {
+        var el = document.getElementById('analysis-note');
+        var body = document.getElementById('analysis-note-body');
+        if (el && body) {
+            el.classList.toggle('expanded');
+        }
+    }
+
+    var currentResultTab = 'report';
+
+    function switchResultTab(tab) {
+        currentResultTab = tab;
+        document.querySelectorAll('.result-tab').forEach(function (t) {
+            t.classList.toggle('active', t.getAttribute('data-result-tab') === tab);
+        });
+        document.getElementById('result-panel-highlights').classList.toggle('active', tab === 'highlights');
+        document.getElementById('result-panel-report').classList.toggle('active', tab === 'report');
+        document.getElementById('result-bar-highlights').style.display = tab === 'highlights' ? 'block' : 'none';
+        document.getElementById('result-bar-report').style.display = tab === 'report' ? 'block' : 'none';
+    }
+
+    function onGenerateHighlights() {
+        alert('生成集锦');
+    }
+
+    function onDownloadPoster() {
+        alert('下载海报');
+    }
+
+    // Tab 点击与初始化
+    document.querySelectorAll('.segment-tabs .seg-tab').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const tab = this.getAttribute('data-tab');
+            renderSelectGrid(tab);
+        });
+    });
+
+    document.querySelectorAll('.result-tab').forEach(btn => {
+        btn.addEventListener('click', function () {
+            switchResultTab(this.getAttribute('data-result-tab'));
+        });
+    });
+</script>
+
 </body>
 </html>
