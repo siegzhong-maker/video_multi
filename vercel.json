@@ -6,13 +6,3 @@
     }
   ]
 }
-
-{
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/ai-multi-clip-design.html"
-    }
-  ]
-}
-
