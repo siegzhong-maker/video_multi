@@ -1510,14 +1510,15 @@
                 var goResultDirect = false;
                 var btnLabel;
                 if (isSegmentedBlock) {
-                    var anySegmentSuccess = tasks.some(function (x) { return x.status === TASK_STATUS.success; });
-                    if (anySegmentSuccess) {
+                    // 分段任务：只有全部片段分析成功时才允许查看结果
+                    if (segAllSuccess) {
                         btnLabel = '查看结果';
                         goResultDirect = true;
                     } else {
                         btnLabel = '查看进度';
                     }
                 } else {
+                    // 非分段任务：该任务本身成功即可查看结果
                     var singleCanView = mainTask.status === TASK_STATUS.success;
                     if (singleCanView) {
                         btnLabel = '查看结果';
@@ -1684,6 +1685,9 @@
         titleEl.textContent = isSegmentDetail ? '分段任务详情' : '任务详情';
 
         // 列表：分段任务展示每一段，非分段只展示单条
+        var anySuccess = tasks.length > 0 && tasks.some(function (t) { return t.status === TASK_STATUS.success; });
+        var allSuccess = tasks.length > 0 && tasks.every(function (t) { return t.status === TASK_STATUS.success; });
+
         if (isSegmentDetail) {
             sectionTitleEl.style.display = 'block';
             tasks
@@ -1692,26 +1696,39 @@
                     return (a.segmentIndex || 0) - (b.segmentIndex || 0);
                 })
                 .forEach(function (t) {
-                    appendTaskItemForDetail(listEl, t);
+                    // 分段详情中，每一段的「查看」按钮也只在全部成功时可用
+                    appendTaskItemForDetail(listEl, t, { allowView: allSuccess });
                 });
-        } else {
-            appendTaskItemForDetail(listEl, mainTask);
-        }
 
-        var anySuccess = tasks.length > 0 && tasks.some(function (t) { return t.status === TASK_STATUS.success; });
-        if (anySuccess) {
-            primaryBtn.textContent = '查看结果';
-            primaryBtn.onclick = function () {
-                renderResult();
-                navTo('page-result');
-            };
+            if (allSuccess) {
+                primaryBtn.textContent = '查看结果';
+                primaryBtn.onclick = function () {
+                    renderResult();
+                    navTo('page-result');
+                };
+            } else {
+                primaryBtn.textContent = '返回任务列表';
+                primaryBtn.onclick = function () { navTo('page-task-list'); };
+            }
         } else {
-            primaryBtn.textContent = '返回任务列表';
-            primaryBtn.onclick = function () { navTo('page-task-list'); };
+            appendTaskItemForDetail(listEl, mainTask, { allowView: true });
+
+            if (anySuccess) {
+                primaryBtn.textContent = '查看结果';
+                primaryBtn.onclick = function () {
+                    renderResult();
+                    navTo('page-result');
+                };
+            } else {
+                primaryBtn.textContent = '返回任务列表';
+                primaryBtn.onclick = function () { navTo('page-task-list'); };
+            }
         }
     }
 
-    function appendTaskItemForDetail(container, t) {
+    function appendTaskItemForDetail(container, t, options) {
+        options = options || {};
+        var allowView = options.allowView !== false;
         if (!container || !t) return;
         var div = document.createElement('div');
         div.className = 'task-item' + (t.status === TASK_STATUS.failed ? ' failed' : '');
@@ -1742,7 +1759,7 @@
             (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
             '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
             '</div>';
-        if (t.status === TASK_STATUS.success) {
+        if (t.status === TASK_STATUS.success && allowView) {
             var viewBtn = document.createElement('button');
             viewBtn.className = 'task-item-view done';
             viewBtn.textContent = '查看';
