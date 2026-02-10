@@ -309,6 +309,12 @@
         .task-top-progress #task-progress-label { font-size: 13px; color: #8E8E93; margin-left: 6px; }
         .task-top-progress-bar { height: 4px; background: #2C2C2E; border-radius: 2px; margin-top: 10px; overflow: hidden; }
         .task-top-progress-fill { height: 100%; background: var(--primary-color); border-radius: 2px; transition: width 0.2s ease; width: 0%; }
+        .task-retry-hint {
+            font-size: 12px;
+            color: #8E8E93;
+            margin-top: 6px;
+            display: none;
+        }
 
         /* 统一任务卡片样式（分段 & 非分段） */
         .task-card {
@@ -777,6 +783,7 @@
                 <span id="task-progress-label">视频片段已完成分析</span>
                 <div class="task-top-progress-bar"><div class="task-top-progress-fill" id="task-top-progress-fill"></div></div>
             </div>
+            <div id="task-retry-hint" class="task-retry-hint" style="display:none;"></div>
             <div id="task-current-wrap">
                 <div class="task-item" id="task-current-item">
                     <div class="task-item-thumb-wrap">
@@ -1286,6 +1293,18 @@
         if (labelEl) labelEl.textContent = '视频片段已完成分析';
         if (fillEl) fillEl.style.width = (total ? (completed / total) * 100 : 0) + '%';
 
+        var retryHintEl = document.getElementById('task-retry-hint');
+        if (retryHintEl) {
+            var retryingCount = listToRender.filter(function (t) { return t.isRetrying; }).length;
+            if (retryingCount > 0) {
+                retryHintEl.style.display = 'block';
+                retryHintEl.textContent = '正在重试 ' + retryingCount + ' 个片段…';
+            } else {
+                retryHintEl.style.display = 'none';
+                retryHintEl.textContent = '';
+            }
+        }
+
         var running = getCurrentRunningTask();
         var firstPending = getFirstPendingTask();
         var current = isDemo ? null : (running || firstPending);
@@ -1316,7 +1335,7 @@
                 }
                 if (timeEl) timeEl.textContent = '开始分析: ' + formatTaskTimeShort(current.uploadTime || new Date());
                 if (viewBtn) {
-                    var canView = current.status === TASK_STATUS.success && allSuccess;
+                    var canView = current.status === TASK_STATUS.success;
                     viewBtn.style.display = canView ? 'block' : 'none';
                     viewBtn.disabled = !canView;
                     viewBtn.className = 'task-item-view ' + (canView ? 'done' : 'pending');
@@ -1399,7 +1418,7 @@
                     retryBtn.textContent = '重试';
                     retryBtn.onclick = function () { retryAllFailed(); };
                     div.appendChild(retryBtn);
-                } else if (showViewButton && t.status === TASK_STATUS.success && allSuccess) {
+                } else if (showViewButton && t.status === TASK_STATUS.success) {
                     var viewBtn = document.createElement('button');
                     viewBtn.className = 'task-item-view done';
                     viewBtn.textContent = '查看';
@@ -1430,6 +1449,9 @@
                         statusDotClass = 'red';
                     } else if (segAllSuccess) {
                         statusLabel = '分析完成';
+                        statusDotClass = 'green';
+                    } else if (segCompleted > 0) {
+                        statusLabel = '部分完成';
                         statusDotClass = 'green';
                     } else {
                         statusLabel = '分析中';
@@ -1488,14 +1510,16 @@
                 var goResultDirect = false;
                 var btnLabel;
                 if (isSegmentedBlock) {
-                    if (segAllSuccess && allSuccess) {
+                    var anySegmentSuccess = tasks.some(function (x) { return x.status === TASK_STATUS.success; });
+                    if (anySegmentSuccess) {
                         btnLabel = '查看结果';
                         goResultDirect = true;
                     } else {
                         btnLabel = '查看进度';
                     }
                 } else {
-                    if (mainTask.status === TASK_STATUS.success && allSuccess) {
+                    var singleCanView = mainTask.status === TASK_STATUS.success;
+                    if (singleCanView) {
                         btnLabel = '查看结果';
                         goResultDirect = true;
                     } else {
@@ -1674,8 +1698,8 @@
             appendTaskItemForDetail(listEl, mainTask);
         }
 
-        var allSuccess = tasks.length > 0 && tasks.every(function (t) { return t.status === TASK_STATUS.success; });
-        if (allSuccess) {
+        var anySuccess = tasks.length > 0 && tasks.some(function (t) { return t.status === TASK_STATUS.success; });
+        if (anySuccess) {
             primaryBtn.textContent = '查看结果';
             primaryBtn.onclick = function () {
                 renderResult();
@@ -1754,6 +1778,7 @@
                 task.progress = 100;
                 task.errorMessage = '';
                 task.completedAt = task.completedAt || new Date().toISOString();
+                task.isRetrying = false;
                 renderTaskList();
                 if (onDone) onDone();
                 return;
@@ -1785,23 +1810,27 @@
     function retryTask(taskId) {
         var t = taskList.find(function (x) { return x.id === taskId; });
         if (t && t.status === TASK_STATUS.failed) {
+            t.isRetrying = true;
             t.status = TASK_STATUS.pending;
             t.phase = 'transferring';
             t.errorMessage = '';
             t.progress = 0;
             renderTaskList();
             runNextTask();
+            showToastMessage('已重新排队进行分析，请稍候…');
             return;
         }
         if (window._demoTaskList) {
             t = window._demoTaskList.find(function (x) { return x.id === taskId; });
             if (t && t.status === TASK_STATUS.failed) {
+                t.isRetrying = true;
                 t.status = TASK_STATUS.pending;
                 t.phase = 'transferring';
                 t.errorMessage = '';
                 t.progress = 0;
                 renderTaskList();
                 runDemoRetryPhases(t);
+                showToastMessage('已重新排队进行分析，请稍候…');
             }
         }
     }
@@ -1815,12 +1844,14 @@
                     t.phase = 'transferring';
                     t.errorMessage = '';
                     t.progress = 0;
+                    t.isRetrying = true;
                     any = true;
                 }
             });
             if (any) {
                 renderTaskList();
                 runNextTask();
+                showToastMessage('已重新排队进行分析，请稍候…');
             }
             return;
         }
@@ -1831,6 +1862,7 @@
                 t.phase = 'transferring';
                 t.errorMessage = '';
                 t.progress = 0;
+                t.isRetrying = true;
             });
             if (failedList.length === 0) return;
             renderTaskList();
@@ -1839,6 +1871,7 @@
                 runDemoRetryPhases(failedList[i], function () { runNext(i + 1); });
             }
             runNext(0);
+            showToastMessage('已重新排队进行分析，请稍候…');
         }
     }
 
@@ -1928,6 +1961,7 @@
                 if (idx === 1) {
                     task.status = TASK_STATUS.failed;
                     task.errorMessage = ERROR_MESSAGES.upload_failed;
+                    task.isRetrying = false;
                     showToastMessage(ERROR_MESSAGES.upload_failed);
                     renderTaskList();
                     runNextTask();
@@ -1942,6 +1976,7 @@
                 if (idx === 2) {
                     task.status = TASK_STATUS.failed;
                     task.errorMessage = ERROR_MESSAGES.analysis_failed;
+                    task.isRetrying = false;
                     showToastMessage(ERROR_MESSAGES.analysis_failed);
                     renderTaskList();
                     runNextTask();
@@ -1950,6 +1985,7 @@
                 task.status = TASK_STATUS.success;
                 task.progress = 100;
                 task.completedAt = new Date().toISOString();
+                task.isRetrying = false;
                 renderTaskList();
                 runNextTask();
             });
