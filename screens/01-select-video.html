@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>选择视频 - 篮球分析 KEP</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <style>
+    .video-card .thumbnail { background: linear-gradient(180deg, #1a3a2a 0%, #0d1a12 50%, #1a2e22 100%); }
+    .selected-preview-item .thumb-placeholder { width: 100%; height: 100%; background: linear-gradient(180deg, #1a3a2a, #0d1a12); }
+  </style>
+</head>
+<body>
+  <div class="app-frame">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons">
+        <span>📶</span>
+        <span>📡</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <nav class="nav-bar">
+      <a href="../index.html" class="back-btn">‹</a>
+      <span class="title">选择视频</span>
+      <span class="placeholder"></span>
+    </nav>
+
+    <div class="screen">
+      <main class="content">
+        <p class="section-label">从 Falcon 录制中选择（多选，最多 10 个）</p>
+        <div class="video-grid">
+          <div class="video-card selected">
+            <div class="thumbnail"></div>
+            <span class="check">✓</span>
+            <span class="play-icon">▶</span>
+          </div>
+          <div class="video-card selected">
+            <div class="thumbnail"></div>
+            <span class="check">✓</span>
+            <span class="play-icon">▶</span>
+          </div>
+          <div class="video-card">
+            <div class="thumbnail"></div>
+            <span class="check">✓</span>
+            <span class="play-icon">▶</span>
+          </div>
+          <div class="video-card selected">
+            <div class="thumbnail"></div>
+            <span class="check">✓</span>
+            <span class="play-icon">▶</span>
+          </div>
+          <div class="video-card">
+            <div class="thumbnail"></div>
+            <span class="check">✓</span>
+            <span class="play-icon">▶</span>
+          </div>
+          <div class="video-card">
+            <div class="thumbnail"></div>
+            <span class="check">✓</span>
+            <span class="play-icon">▶</span>
+          </div>
+        </div>
+
+        <p class="section-label" style="margin-top: 28px;">已选预览</p>
+        <div class="selected-preview">
+          <div class="selected-preview-item">
+            <div class="thumb-placeholder"></div>
+            <span class="remove">×</span>
+          </div>
+          <div class="selected-preview-item">
+            <div class="thumb-placeholder"></div>
+            <span class="remove">×</span>
+          </div>
+          <div class="selected-preview-item">
+            <div class="thumb-placeholder"></div>
+            <span class="remove">×</span>
+          </div>
+        </div>
+
+        <p class="section-label" style="margin-top: 28px;">保存到（可选预填）</p>
+        <div class="platform-picker">
+          <div class="platform-item selected">
+            <div class="icon">🎵</div>
+            <span>TikTok</span>
+          </div>
+          <div class="platform-item selected">
+            <div class="icon">▶</div>
+            <span>YouTube</span>
+          </div>
+          <div class="platform-item">
+            <div class="icon">📷</div>
+            <span>Instagram</span>
+          </div>
+          <div class="platform-item">
+            <div class="icon">📁</div>
+            <span>本地</span>
+          </div>
+        </div>
+      </main>
+
+      <footer class="bottom-bar">
+        <div class="bottom-bar-inline">
+          <button class="btn btn-secondary">取消</button>
+          <button class="btn btn-primary">导入并分析</button>
+        </div>
+        <p class="hint">已选 3 个视频 · 保存到 TikTok, YouTube</p>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

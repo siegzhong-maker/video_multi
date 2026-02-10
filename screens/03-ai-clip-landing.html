@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AI 剪报 - 篮球分析 KEP</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+  <style>
+    .main-video .court-pattern { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 20px 20px; }
+  </style>
+</head>
+<body>
+  <div class="app-frame">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <div class="icons">
+        <span>📶</span>
+        <span>📡</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <nav class="nav-bar">
+      <a href="../index.html" class="back-btn">‹</a>
+      <span class="title">AI 剪报</span>
+      <span class="placeholder"></span>
+    </nav>
+
+    <div class="screen">
+      <main class="content">
+        <span class="aspect-tag">9:16 竖屏</span>
+        <div class="main-video">
+          <div class="court-pattern"></div>
+        </div>
+
+        <p class="section-label">AI 生成的 clip（可多选保存）</p>
+        <div class="clip-grid">
+          <div class="clip-card selected">
+            <div class="thumb"></div>
+            <span class="check">✓</span>
+            <span class="duration">0:15</span>
+          </div>
+          <div class="clip-card selected">
+            <div class="thumb"></div>
+            <span class="check">✓</span>
+            <span class="duration">0:08</span>
+          </div>
+          <div class="clip-card">
+            <div class="thumb"></div>
+            <span class="check">✓</span>
+            <span class="duration">0:12</span>
+          </div>
+          <div class="clip-card">
+            <div class="thumb"></div>
+            <span class="check">✓</span>
+            <span class="duration">0:20</span>
+          </div>
+          <div class="clip-card">
+            <div class="thumb"></div>
+            <span class="check">✓</span>
+            <span class="duration">0:06</span>
+          </div>
+          <div class="clip-card">
+            <div class="thumb"></div>
+            <span class="check">✓</span>
+            <span class="duration">0:10</span>
+          </div>
+        </div>
+      </main>
+
+      <footer class="bottom-bar">
+        <div class="bottom-bar-inline">
+          <button class="btn btn-secondary">稍后</button>
+          <a href="#save-modal" class="btn btn-primary">保存</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <div id="save-modal" class="modal-overlay">
+    <a href="#" class="modal-backdrop" style="position:absolute;inset:0;z-index:0;" aria-label="关闭"></a>
+    <div class="modal">
+      <h2>多端保存</h2>
+      <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;">保存已选 2 个 clip 到以下平台</p>
+
+      <div class="modal-section">
+        <label>选择目标平台</label>
+        <div class="platform-picker" style="margin-top: 10px;">
+          <div class="platform-item selected">
+            <div class="icon">🎵</div>
+            <span>TikTok</span>
+          </div>
+          <div class="platform-item selected">
+            <div class="icon">▶</div>
+            <span>YouTube</span>
+          </div>
+          <div class="platform-item">
+            <div class="icon">📷</div>
+            <span>Instagram</span>
+          </div>
+          <div class="platform-item">
+            <div class="icon">📁</div>
+            <span>本地</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <label>TikTok · 标题</label>
+        <input type="text" placeholder="填写标题（选填）">
+      </div>
+      <div class="modal-section">
+        <label>YouTube · 标题</label>
+        <input type="text" placeholder="填写标题（选填）">
+      </div>
+
+      <div class="modal-section">
+        <label>导出进度</label>
+        <div class="progress-list">
+          <div class="progress-item pending">
+            <span>TikTok</span>
+            <span style="font-size: 13px; color: var(--text-muted);">等待中</span>
+          </div>
+          <div class="progress-item pending">
+            <span>YouTube</span>
+            <span style="font-size: 13px; color: var(--text-muted);">等待中</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <a href="#" class="btn btn-secondary" style="flex:1;text-decoration:none;text-align:center;">取消</a>
+        <button class="btn btn-primary" style="flex:1;">确认保存</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
