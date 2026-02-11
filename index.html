@@ -1824,6 +1824,7 @@
                 task.completedAt = task.completedAt || new Date().toISOString();
                 task.isRetrying = false;
                 renderTaskList();
+                renderTaskDetail();
                 if (onDone) onDone();
                 return;
             }
@@ -1832,7 +1833,8 @@
             task.status = phaseStatus;
             task.phase = phaseKey;
             task.progress = 0;
-            renderTaskList();
+                renderTaskList();
+                renderTaskDetail();
             var start = Date.now();
             if (demoRetryTimer) clearInterval(demoRetryTimer);
             demoRetryTimer = setInterval(function () {
@@ -1840,6 +1842,7 @@
                 var pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
                 task.progress = pct;
                 renderTaskList();
+                renderTaskDetail();
                 if (pct >= 100) {
                     clearInterval(demoRetryTimer);
                     demoRetryTimer = null;
@@ -1960,6 +1963,7 @@
         task.phase = phaseKey;
         task.progress = 0;
         renderTaskList();
+        renderTaskDetail();
         var start = Date.now();
         function tick() {
             if (task.status === TASK_STATUS.failed) return;
@@ -1967,6 +1971,7 @@
             var pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
             task.progress = pct;
             renderTaskList();
+            renderTaskDetail();
             if (pct >= 100) {
                 if (taskProgressTimer) clearInterval(taskProgressTimer);
                 taskProgressTimer = null;
