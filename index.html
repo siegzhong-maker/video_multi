@@ -309,6 +309,9 @@
         .task-top-progress #task-progress-label { font-size: 13px; color: #8E8E93; margin-left: 6px; }
         .task-top-progress-bar { height: 4px; background: #2C2C2E; border-radius: 2px; margin-top: 10px; overflow: hidden; }
         .task-top-progress-fill { height: 100%; background: var(--primary-color); border-radius: 2px; transition: width 0.2s ease; width: 0%; }
+        .task-list-filter-chips { display: flex; gap: 10px; margin-bottom: 12px; }
+        .task-list-filter-chips .chip { padding: 6px 14px; background: #2C2C2E; border-radius: 6px; font-size: 13px; color: #8E8E93; font-weight: 500; border: none; cursor: pointer; }
+        .task-list-filter-chips .chip.active { background: var(--primary-color); color: white; }
         .task-retry-hint {
             font-size: 12px;
             color: #8E8E93;
@@ -783,6 +786,11 @@
                 <span id="task-progress-label">视频片段已完成分析</span>
                 <div class="task-top-progress-bar"><div class="task-top-progress-fill" id="task-top-progress-fill"></div></div>
             </div>
+            <div class="task-list-filter-chips" id="task-list-filter-chips">
+                <button type="button" class="chip active" data-sport-filter="all">全部</button>
+                <button type="button" class="chip" data-sport-filter="football">足球</button>
+                <button type="button" class="chip" data-sport-filter="basketball">篮球</button>
+            </div>
             <div id="task-retry-hint" class="task-retry-hint" style="display:none;"></div>
             <div id="task-current-wrap">
                 <div class="task-item" id="task-current-item">
@@ -797,7 +805,7 @@
                             <span id="task-current-status">• 本地传输中…</span>
                             <span id="task-current-pct"></span>
                         </div>
-                        <div class="task-item-tag">篮球</div>
+                        <div class="task-item-tag" id="task-current-tag">篮球</div>
                         <div class="task-item-time" id="task-current-time">开始分析: --</div>
                     </div>
                     <button class="task-item-view pending" id="task-current-view" disabled>View</button>
@@ -937,25 +945,25 @@
     // 传输状态：仅设备 / 已到本地 / 已到云（仅 cloud 可分析）
     const VIDEO_LISTS = {
         falcon: [
-            { id: 'vid-group-1', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true },
-            { id: 'vid-group-2', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false },
-            { id: 'vid-group-3', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false },
-            { id: 'vid-single-1', type: 'single1', syncStatus: 'device_only', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false },
-            { id: 'vid-single-2', type: 'single2', syncStatus: 'local', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false }
+            { id: 'vid-group-1', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true, sport: 'basketball' },
+            { id: 'vid-group-2', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-group-3', type: 'group', syncStatus: 'device_only', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-single-1', type: 'single1', syncStatus: 'device_only', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-single-2', type: 'single2', syncStatus: 'local', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false, sport: 'football' }
         ],
         local: [
-            { id: 'vid-group-1', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true },
-            { id: 'vid-group-2', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false },
-            { id: 'vid-group-3', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false },
-            { id: 'vid-single-1', type: 'single1', syncStatus: 'cloud', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false },
-            { id: 'vid-single-2', type: 'single2', syncStatus: 'local', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false }
+            { id: 'vid-group-1', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true, sport: 'basketball' },
+            { id: 'vid-group-2', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-group-3', type: 'group', syncStatus: 'local', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-single-1', type: 'single1', syncStatus: 'cloud', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-single-2', type: 'single2', syncStatus: 'local', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false, sport: 'football' }
         ],
         cloud: [
-            { id: 'vid-group-1', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true },
-            { id: 'vid-group-2', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false },
-            { id: 'vid-group-3', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false },
-            { id: 'vid-single-1', type: 'single1', syncStatus: 'cloud', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false },
-            { id: 'vid-single-2', type: 'single2', syncStatus: 'cloud', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false }
+            { id: 'vid-group-1', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '04:21', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: true, sport: 'basketball' },
+            { id: 'vid-group-2', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '03:10', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(10deg)', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-group-3', type: 'group', syncStatus: 'cloud', date: '2025-04-23', duration: '10:05', thumb: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80', filter: 'hue-rotate(20deg)', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-single-1', type: 'single1', syncStatus: 'cloud', date: '2025-04-21', duration: '05:00', thumb: 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false, sport: 'basketball' },
+            { id: 'vid-single-2', type: 'single2', syncStatus: 'cloud', date: '2025-04-21', duration: '02:30', thumb: 'https://images.unsplash.com/photo-1628779238951-be2c9f2a0758?auto=format&fit=crop&w=300&q=80', filter: '', isGroupFirst: false, sport: 'football' }
         ]
     };
 
@@ -987,23 +995,24 @@
     var taskProgressTimer = null;
     var currentTaskIndex = -1; // 当前执行到的任务下标（串行）
     var expandedSegmentGroupId = null; // 当前展开的分段任务组 id，用于折叠/展开
+    var taskListSportFilter = 'all'; // 'all' | 'basketball' | 'football'
 
     /** 默认展示用：无任务时展示多个分析任务（两非分段 + 两分段组） */
     function getDefaultDemoTaskList() {
         var thumb = 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?auto=format&fit=crop&w=300&q=80';
         var thumb2 = 'https://images.unsplash.com/photo-1519861531473-920026393112?auto=format&fit=crop&w=300&q=80';
         var base = [
-            { id: 'demo-whole-1', videoId: 'demo-whole-1', thumb: thumb2, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '整片', isSegmented: false, groupId: null, uploadTime: '2025-02-08T10:00:00', completedAt: '2025-02-08T10:05:00', duration: '05:00', fileName: '整场录像.mp4' },
-            { id: 'demo-whole-2', videoId: 'demo-whole-2', thumb: thumb2, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '单条视频', isSegmented: false, groupId: null, uploadTime: '2025-02-09T14:20:00', completedAt: '2025-02-09T14:23:00', duration: '02:30', fileName: '单条视频.mp4' },
-            { id: 'demo-seg-1', videoId: 'demo-seg-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 01', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21' },
-            { id: 'demo-seg-2', videoId: 'demo-seg-2', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 02', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31' },
-            { id: 'demo-seg-3', videoId: 'demo-seg-3', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 03', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36' },
-            { id: 'demo-seg2-1', videoId: 'demo-seg2-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 01', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21' },
-            { id: 'demo-seg2-2', videoId: 'demo-seg2-2', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 02', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31' },
-            { id: 'demo-seg2-3', videoId: 'demo-seg2-3', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 03', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36' },
-            { id: 'demo-seg-fail-1', videoId: 'demo-seg-fail-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1112 - 01', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: '2025-02-10T15:06:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21' },
-            { id: 'demo-seg-fail-2', videoId: 'demo-seg-fail-2', thumb: thumb, phase: 'uploading', status: TASK_STATUS.failed, errorMessage: ERROR_MESSAGES.upload_failed, progress: 0, displayName: '1112 - 02', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: null, duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31' },
-            { id: 'demo-seg-fail-3', videoId: 'demo-seg-fail-3', thumb: thumb, phase: 'analyzing', status: TASK_STATUS.failed, errorMessage: ERROR_MESSAGES.analysis_failed, progress: 0, displayName: '1112 - 03', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: null, duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36' }
+            { id: 'demo-whole-1', videoId: 'demo-whole-1', thumb: thumb2, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '整片', isSegmented: false, groupId: null, uploadTime: '2025-02-08T10:00:00', completedAt: '2025-02-08T10:05:00', duration: '05:00', fileName: '整场录像.mp4', sport: 'basketball' },
+            { id: 'demo-whole-2', videoId: 'demo-whole-2', thumb: thumb2, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '单条视频', isSegmented: false, groupId: null, uploadTime: '2025-02-09T14:20:00', completedAt: '2025-02-09T14:23:00', duration: '02:30', fileName: '单条视频.mp4', sport: 'football' },
+            { id: 'demo-seg-1', videoId: 'demo-seg-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 01', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21', sport: 'basketball' },
+            { id: 'demo-seg-2', videoId: 'demo-seg-2', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 02', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31', sport: 'basketball' },
+            { id: 'demo-seg-3', videoId: 'demo-seg-3', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1029 - 03', isSegmented: true, groupId: 'segmented-demo', uploadTime: '2025-02-10T09:00:00', completedAt: '2025-02-10T09:08:00', duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36', sport: 'basketball' },
+            { id: 'demo-seg2-1', videoId: 'demo-seg2-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 01', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21', sport: 'football' },
+            { id: 'demo-seg2-2', videoId: 'demo-seg2-2', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 02', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31', sport: 'football' },
+            { id: 'demo-seg2-3', videoId: 'demo-seg2-3', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1105 - 03', isSegmented: true, groupId: 'segmented-demo-2', uploadTime: '2025-02-10T11:00:00', completedAt: '2025-02-10T11:12:00', duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36', sport: 'football' },
+            { id: 'demo-seg-fail-1', videoId: 'demo-seg-fail-1', thumb: thumb, phase: 'success', status: TASK_STATUS.success, errorMessage: '', progress: 100, displayName: '1112 - 01', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: '2025-02-10T15:06:00', duration: '04:21', segmentIndex: 1, segmentTotal: 3, startTime: '00:00', endTime: '04:21', sport: 'basketball' },
+            { id: 'demo-seg-fail-2', videoId: 'demo-seg-fail-2', thumb: thumb, phase: 'uploading', status: TASK_STATUS.failed, errorMessage: ERROR_MESSAGES.upload_failed, progress: 0, displayName: '1112 - 02', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: null, duration: '03:10', segmentIndex: 2, segmentTotal: 3, startTime: '04:21', endTime: '07:31', sport: 'basketball' },
+            { id: 'demo-seg-fail-3', videoId: 'demo-seg-fail-3', thumb: thumb, phase: 'analyzing', status: TASK_STATUS.failed, errorMessage: ERROR_MESSAGES.analysis_failed, progress: 0, displayName: '1112 - 03', isSegmented: true, groupId: 'segmented-demo-failed', uploadTime: '2025-02-10T15:00:00', completedAt: null, duration: '10:05', segmentIndex: 3, segmentTotal: 3, startTime: '07:31', endTime: '17:36', sport: 'basketball' }
         ];
         return base;
     }
@@ -1207,7 +1216,8 @@
                 segmentTotal: null,
                 startTime: null,
                 endTime: null,
-                fileName: null
+                fileName: null,
+                sport: (v && v.sport) ? v.sport : 'basketball'
             };
         });
         // 分段任务：设置 segmentIndex / segmentTotal
@@ -1267,6 +1277,16 @@
         }
         var listToRender = isDemo ? window._demoTaskList : taskList;
 
+        var filterChipsEl = document.getElementById('task-list-filter-chips');
+        if (filterChipsEl) {
+            filterChipsEl.querySelectorAll('.chip').forEach(function (c) {
+                c.classList.toggle('active', c.getAttribute('data-sport-filter') === taskListSportFilter);
+            });
+        }
+        if (taskListSportFilter !== 'all') {
+            listToRender = listToRender.filter(function (t) { return t.sport === taskListSportFilter; });
+        }
+
         var counts = isDemo ? (function () {
             var ok = 0, fail = 0;
             listToRender.forEach(function (t) {
@@ -1308,6 +1328,9 @@
         var running = getCurrentRunningTask();
         var firstPending = getFirstPendingTask();
         var current = isDemo ? null : (running || firstPending);
+        if (current && taskListSportFilter !== 'all' && current.sport !== taskListSportFilter) {
+            current = null;
+        }
 
         var wrap = document.getElementById('task-current-wrap');
         var currentItem = document.getElementById('task-current-item');
@@ -1321,6 +1344,8 @@
                 var dotEl = document.getElementById('task-current-dot');
                 var timeEl = document.getElementById('task-current-time');
                 var viewBtn = document.getElementById('task-current-view');
+                var tagEl = document.getElementById('task-current-tag');
+                if (tagEl) tagEl.textContent = (current.sport === 'football') ? '足球' : '篮球';
                 if (titleEl) titleEl.textContent = current.displayName != null ? current.displayName : (current.videoId || current.id);
                 if (thumbEl) thumbEl.style.backgroundImage = current.thumb ? 'url(' + current.thumb + ')' : 'none';
                 var durationEl = document.getElementById('task-current-duration');
@@ -1408,7 +1433,7 @@
                     '<span>' + (t.status === TASK_STATUS.failed ? (t.errorMessage || '失败') : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
                     (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
                     '</div>' +
-                    '<div class="task-item-tag">篮球</div>' +
+                    '<div class="task-item-tag">' + ((t.sport === 'football') ? '足球' : '篮球') + '</div>' +
                     (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
                     '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
                     '</div>';
@@ -1538,11 +1563,13 @@
 
                 var durationBadgeHtml = timeRangeText ? '<span class="task-item-duration-badge">' + (timeRangeText + '').replace(/</g, '&lt;') + '</span>' : '';
                 var thumbUrl = (mainTask.thumb || '');
+                var sportTagText = (mainTask.sport === 'football') ? '足球' : '篮球';
                 card.innerHTML =
                     '<div class="task-card-header">' +
                     '<div class="task-card-title-row">' +
                     '<span class="task-card-title">' + (title || '').replace(/</g, '&lt;') + '</span>' +
                     '<span class="task-card-type-tag">' + labelText + '</span>' +
+                    '<span class="task-card-type-tag">' + sportTagText + '</span>' +
                     '</div>' +
                     '<div class="task-card-status-row">' +
                     '<span class="task-item-dot ' + statusDotClass + '"></span>' +
@@ -1755,7 +1782,7 @@
             '<span>' + (t.status === TASK_STATUS.failed ? (t.errorMessage || '失败') : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
             (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
             '</div>' +
-            '<div class="task-item-tag">篮球</div>' +
+            '<div class="task-item-tag">' + ((t.sport === 'football') ? '足球' : '篮球') + '</div>' +
             (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
             '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
             '</div>';
@@ -2095,6 +2122,17 @@
             switchResultTab(this.getAttribute('data-result-tab'));
         });
     });
+
+    var filterChipsEl = document.getElementById('task-list-filter-chips');
+    if (filterChipsEl) {
+        filterChipsEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('.chip[data-sport-filter]');
+            if (!btn) return;
+            taskListSportFilter = btn.getAttribute('data-sport-filter') || 'all';
+            filterChipsEl.querySelectorAll('.chip').forEach(function (c) { c.classList.toggle('active', c.getAttribute('data-sport-filter') === taskListSportFilter); });
+            renderTaskList();
+        });
+    }
 </script>
 
 </body>
