@@ -2002,10 +2002,11 @@
         function doUpload() {
             runTaskPhaseForTask(idx, 'uploading', 1200, function () {
                 if (task.status === TASK_STATUS.failed) { runNextTask(); return; }
-                if (idx === 1) {
+                if (idx === 1 && !task._uploadFailedOnce) {
                     task.status = TASK_STATUS.failed;
                     task.errorMessage = ERROR_MESSAGES.upload_failed;
                     task.isRetrying = false;
+                    task._uploadFailedOnce = true;
                     showToastMessage(ERROR_MESSAGES.upload_failed);
                     renderTaskList();
                     runNextTask();
@@ -2017,10 +2018,11 @@
         function doAnalyze() {
             runTaskPhaseForTask(idx, 'analyzing', 1200, function () {
                 if (task.status === TASK_STATUS.failed) { runNextTask(); return; }
-                if (idx === 2) {
+                if (idx === 2 && !task._analyzeFailedOnce) {
                     task.status = TASK_STATUS.failed;
                     task.errorMessage = ERROR_MESSAGES.analysis_failed;
                     task.isRetrying = false;
+                    task._analyzeFailedOnce = true;
                     showToastMessage(ERROR_MESSAGES.analysis_failed);
                     renderTaskList();
                     runNextTask();
