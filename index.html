@@ -1739,8 +1739,8 @@
                     navTo('page-result');
                 };
             } else {
-                primaryBtn.textContent = '返回任务列表';
-                primaryBtn.onclick = function () { navTo('page-task-list'); };
+                primaryBtn.textContent = '重试';
+                primaryBtn.onclick = function () { retryFailedInCurrentDetail(); };
             }
         } else {
             appendTaskItemForDetail(listEl, mainTask, { allowView: true });
@@ -1752,8 +1752,8 @@
                     navTo('page-result');
                 };
             } else {
-                primaryBtn.textContent = '返回任务列表';
-                primaryBtn.onclick = function () { navTo('page-task-list'); };
+                primaryBtn.textContent = '重试';
+                primaryBtn.onclick = function () { retryFailedInCurrentDetail(); };
             }
         }
     }
@@ -1925,6 +1925,50 @@
             runNext(0);
             showToastMessage('已重新排队进行分析，请稍候…');
         }
+    }
+
+    /** 仅重试当前详情页内的失败任务（当前分组或当前单条） */
+    function retryFailedInCurrentDetail() {
+        var source = getTaskSourceList(currentDetailContext.isDemo);
+        var tasks;
+        if (currentDetailContext.groupId) {
+            tasks = source.filter(function (t) { return t.groupId === currentDetailContext.groupId; });
+        } else if (currentDetailContext.taskId) {
+            tasks = source.filter(function (t) { return t.id === currentDetailContext.taskId; });
+        } else {
+            tasks = [];
+        }
+        var failedList = (tasks || []).filter(function (t) { return t.status === TASK_STATUS.failed; });
+        if (failedList.length === 0) {
+            renderTaskDetail();
+            return;
+        }
+        var isDemo = currentDetailContext.isDemo;
+        failedList.forEach(function (t) {
+            t.status = TASK_STATUS.pending;
+            t.phase = 'transferring';
+            t.errorMessage = '';
+            t.progress = 0;
+            t.isRetrying = true;
+        });
+        if (isDemo) {
+            renderTaskList();
+            renderTaskDetail();
+            function runNext(i) {
+                if (i >= failedList.length) {
+                    renderTaskList();
+                    renderTaskDetail();
+                    return;
+                }
+                runDemoRetryPhases(failedList[i], function () { runNext(i + 1); });
+            }
+            runNext(0);
+        } else {
+            renderTaskList();
+            renderTaskDetail();
+            runNextTask();
+        }
+        showToastMessage('已重新排队进行分析，请稍候…');
     }
 
     function formatTaskTime(date) {
