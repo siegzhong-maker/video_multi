@@ -1784,7 +1784,7 @@
             segmentMetaHtml +
             '<div class="task-item-status">' +
             '<span class="task-item-dot ' + (t.status === TASK_STATUS.success ? 'green' : t.status === TASK_STATUS.failed ? 'red' : 'green') + '"></span>' +
-            '<span>' + (t.status === TASK_STATUS.failed ? (t.errorMessage || '失败') : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
+            '<span>' + (t.status === TASK_STATUS.failed ? '失败' : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
             (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
             '</div>' +
             '<div class="task-item-tag">' + ((t.sport === 'football') ? '足球' : '篮球') + '</div>' +
@@ -1797,12 +1797,6 @@
             viewBtn.textContent = '查看';
             viewBtn.onclick = function () { renderResult(); navTo('page-result'); };
             div.appendChild(viewBtn);
-        } else if (t.status === TASK_STATUS.failed) {
-            var retryBtn = document.createElement('button');
-            retryBtn.className = 'task-item-retry';
-            retryBtn.textContent = '重试';
-            retryBtn.onclick = function () { retryTask(t.id); };
-            div.appendChild(retryBtn);
         }
         container.appendChild(div);
     }
