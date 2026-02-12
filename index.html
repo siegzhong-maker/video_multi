@@ -280,6 +280,14 @@
         .modal-btn:active { background: rgba(255,255,255,0.1); }
         .modal-btn:last-child { border: none; color: white; font-weight: 400; }
 
+        .modal-video-box { width: 90%; max-width: 380px; }
+        .modal-video-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 0.5px solid #38383A; }
+        .modal-video-title { font-size: 15px; font-weight: 600; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 8px; }
+        .modal-video-close { width: 32px; height: 32px; border: none; background: transparent; color: #8E8E93; font-size: 24px; line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0; }
+        .modal-video-close:active { color: white; }
+        .modal-video-container { background: #000; max-height: 60vh; min-height: 180px; display: flex; align-items: center; justify-content: center; }
+        .modal-video-element { width: 100%; max-height: 60vh; object-fit: contain; }
+
         /* === 页面3: 排序 (Sequence) === */
         .seq-list { padding: 16px; }
         .seq-item {
@@ -710,6 +718,19 @@
         </div>
     </div>
 
+    <!-- === 视频预览弹窗 === -->
+    <div class="modal-overlay" id="modal-video-preview">
+        <div class="modal-box modal-video-box">
+            <div class="modal-video-header">
+                <span class="modal-video-title" id="modal-video-title"></span>
+                <button type="button" class="modal-video-close" id="modal-video-close" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-video-container">
+                <video id="modal-video-player" controls playsinline poster="" class="modal-video-element"></video>
+            </div>
+        </div>
+    </div>
+
     <!-- === 页面3: 排序 (Sequence) === -->
     <div id="page-sequence" class="page dark-mode hidden">
         <div class="nav-bar">
@@ -988,6 +1009,8 @@
         storage_full: '存储空间不足，请清理后重试'
     };
 
+    var DEMO_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
     let currentSelectTab = 'falcon';
     let selectedMode = null; // 'single' or 'group'
     let selectedVideoIds = []; // 当前选中的可分析视频 id 列表
@@ -1160,6 +1183,56 @@
     function cancelMerge() {
         document.getElementById('modal-merge').classList.remove('show');
     }
+
+    function openVideoPreview(task) {
+        var overlay = document.getElementById('modal-video-preview');
+        var titleEl = document.getElementById('modal-video-title');
+        var video = document.getElementById('modal-video-player');
+        if (!overlay || !titleEl || !video) return;
+        var title = (task.fileName != null ? task.fileName : (task.displayName != null ? task.displayName : task.videoId)) || task.id;
+        var url = (task.videoUrl != null && task.videoUrl !== '') ? task.videoUrl : DEMO_VIDEO_URL;
+        titleEl.textContent = title;
+        video.poster = task.thumb || '';
+        video.src = url;
+        overlay.classList.add('show');
+        function setStartTime() {
+            if (task.startTime) {
+                var parts = (task.startTime + '').split(':');
+                var sec = 0;
+                if (parts.length === 3) sec = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
+                else if (parts.length === 2) sec = parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+                else if (parts.length === 1) sec = parseFloat(parts[0]);
+                if (!isNaN(sec) && sec > 0) video.currentTime = sec;
+            }
+            video.removeEventListener('loadedmetadata', setStartTime);
+            video.removeEventListener('canplay', setStartTime);
+        }
+        video.addEventListener('loadedmetadata', setStartTime);
+        video.addEventListener('canplay', setStartTime);
+        video.play().catch(function () {});
+    }
+
+    function closeVideoPreview() {
+        var overlay = document.getElementById('modal-video-preview');
+        var video = document.getElementById('modal-video-player');
+        if (overlay) overlay.classList.remove('show');
+        if (video) {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+        }
+    }
+
+    (function initVideoPreviewModal() {
+        var overlay = document.getElementById('modal-video-preview');
+        var closeBtn = document.getElementById('modal-video-close');
+        if (overlay) {
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) closeVideoPreview();
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener('click', closeVideoPreview);
+    })();
 
     function handleStart() {
         if (selectedMode === 'single') startLoading();
@@ -1435,11 +1508,11 @@
                     (segmentMetaHtml || '') +
                     '<div class="task-item-status">' +
                     '<span class="task-item-dot ' + (t.status === TASK_STATUS.success ? 'green' : t.status === TASK_STATUS.failed ? 'red' : 'green') + '"></span>' +
-                    '<span>' + (t.status === TASK_STATUS.failed ? (t.errorMessage || '失败') : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
+                    '<span>' + (t.status === TASK_STATUS.failed ? '失败' : (TASK_PHASE_LABELS[t.status] || t.status)) + '</span>' +
                     (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
                     '</div>' +
                     '<div class="task-item-tag">' + ((t.sport === 'football') ? '足球' : '篮球') + '</div>' +
-                    (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
+                    (t.status === TASK_STATUS.failed ? '<div class="task-item-error">' + (t.errorMessage || '未知原因') + '</div>' : '') +
                     '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
                     '</div>';
                 if (t.status === TASK_STATUS.failed) {
@@ -1788,9 +1861,21 @@
             (t.status !== TASK_STATUS.failed && t.status !== TASK_STATUS.success && t.progress ? ' <span>' + t.progress + '%</span>' : '') +
             '</div>' +
             '<div class="task-item-tag">' + ((t.sport === 'football') ? '足球' : '篮球') + '</div>' +
-            (t.status === TASK_STATUS.failed && t.errorMessage ? '<div class="task-item-error">' + t.errorMessage + '</div>' : '') +
+            (t.status === TASK_STATUS.failed ? '<div class="task-item-error">' + (t.errorMessage || '未知原因') + '</div>' : '') +
             '<div class="task-item-time">' + timeLine.replace(/</g, '&lt;') + '</div>' +
             '</div>';
+        var thumbWrap = div.querySelector('.task-item-thumb-wrap');
+        if (thumbWrap) {
+            thumbWrap.style.cursor = 'pointer';
+            thumbWrap.addEventListener('click', function () { openVideoPreview(t); });
+        }
+        var previewBtn = document.createElement('button');
+        previewBtn.className = 'task-item-view pending';
+        previewBtn.style.background = '#2C2C2E';
+        previewBtn.style.color = '#8E8E93';
+        previewBtn.textContent = '预览';
+        previewBtn.onclick = function (e) { e.stopPropagation(); openVideoPreview(t); };
+        div.appendChild(previewBtn);
         if (t.status === TASK_STATUS.success && allowView) {
             var viewBtn = document.createElement('button');
             viewBtn.className = 'task-item-view done';
