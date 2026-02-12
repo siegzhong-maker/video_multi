@@ -1437,14 +1437,8 @@
                     dotEl.classList.add(current.status === TASK_STATUS.failed ? 'red' : 'green');
                 }
                 if (timeEl) timeEl.textContent = '开始分析: ' + formatTaskTimeShort(current.uploadTime || new Date());
-                if (viewBtn) {
-                    var canView = current.status === TASK_STATUS.success;
-                    viewBtn.style.display = canView ? 'block' : 'none';
-                    viewBtn.disabled = !canView;
-                    viewBtn.className = 'task-item-view ' + (canView ? 'done' : 'pending');
-                    viewBtn.textContent = '查看';
-                    viewBtn.onclick = canView ? function () { renderResult(); navTo('page-result'); } : null;
-                }
+                // 分析成功时不再显示「查看」按钮，仅保留底部「查看结果」
+                if (viewBtn) viewBtn.style.display = 'none';
                 currentItem.classList.remove('failed');
             } else {
                 wrap.style.display = 'none';
@@ -1521,13 +1515,8 @@
                     retryBtn.textContent = '重试';
                     retryBtn.onclick = function () { retryAllFailed(); };
                     div.appendChild(retryBtn);
-                } else if (showViewButton && t.status === TASK_STATUS.success) {
-                    var viewBtn = document.createElement('button');
-                    viewBtn.className = 'task-item-view done';
-                    viewBtn.textContent = '查看';
-                    viewBtn.onclick = function () { renderResult(); navTo('page-result'); };
-                    div.appendChild(viewBtn);
                 }
+                // 分析成功时不再显示「查看」按钮，仅保留底部「查看结果」
                 container.appendChild(div);
             }
 
@@ -1876,13 +1865,7 @@
         previewBtn.textContent = '预览';
         previewBtn.onclick = function (e) { e.stopPropagation(); openVideoPreview(t); };
         div.appendChild(previewBtn);
-        if (t.status === TASK_STATUS.success && allowView) {
-            var viewBtn = document.createElement('button');
-            viewBtn.className = 'task-item-view done';
-            viewBtn.textContent = '查看';
-            viewBtn.onclick = function () { renderResult(); navTo('page-result'); };
-            div.appendChild(viewBtn);
-        }
+        // 分析成功时不再显示「查看」按钮，仅保留底部「查看结果」
         container.appendChild(div);
     }
 
